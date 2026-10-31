@@ -1,0 +1,62 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 36 33% 96%; /* #FAF7F2 Warm Cream */
+  --foreground: 0 5% 14%; /* #252222 Black/Charcoal */
+}
+
+body {
+  background-color: #FAF7F2;
+  color: #252222;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Custom modern scrollbars in Light Theme Cream / Burgundy / Dusty Rose */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #EFE7DD;
+}
+::-webkit-scrollbar-thumb {
+  background: #B58B83;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #652D3D;
+}
+
+/* Selection highlight in Burgundy / Cream */
+::selection {
+  background-color: #652D3D;
+  color: #F3EDE3;
+}
+
+/* 3D card perspective for flashcards */
+.perspective-1000 {
+  perspective: 1000px;
+}
+.transform-style-3d {
+  transform-style: preserve-3d;
+}
+.backface-hidden {
+  backface-visibility: hidden;
+}
+.rotate-y-180 {
+  transform: rotateY(180deg);
+}
+
+/* Print styles for PDF export */
+@media print {
+  body {
+    background-color: #ffffff !important;
+    color: #1a1a1a !important;
+  }
+  aside, header, nav, button {
+    display: none !important;
+  }
+}

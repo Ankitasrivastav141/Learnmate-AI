@@ -1,0 +1,287 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Subject {
+  id           String        @id @default(cuid())
+  name         String
+  description  String?
+  color        String        @default("#3b82f6") // Hex color code for badges/cards
+  icon         String        @default("BookOpen") // Lucide icon identifier
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  documents      Document[]
+  quizSessions   QuizSession[]
+  activities     ActivityLog[]
+  courseOutlines CourseOutline[]
+}
+
+model Document {
+  id           String        @id @default(cuid())
+  subjectId    String
+  title        String
+  fileName     String
+  fileType     String        // 'pptx' | 'pdf' | 'docx' | 'txt'
+  fileSize     Int           // bytes
+  filePath     String
+  rawText      String        // extracted text
+  status       String        @default("PENDING") // PENDING, PROCESSING, READY, FAILED
+  errorMessage String?
+  summary      String?
+  pageCount    Int           @default(1)
+  wordCount    Int           @default(0)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  subject      Subject       @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  topics       Topic[]
+  concepts     Concept[]
+  notes        Note[]
+  flashcards   Flashcard[]
+  questions    Question[]
+  quizSessions QuizSession[]
+  chunks       ResourceChunk[]
+}
+
+model Topic {
+  id          String       @id @default(cuid())
+  documentId  String
+  title       String
+  summary     String?
+  orderIndex  Int          @default(0)
+  createdAt   DateTime     @default(now())
+
+  document    Document     @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  concepts    Concept[]
+  notes       Note[]
+  flashcards  Flashcard[]
+  questions   Question[]
+}
+
+model Concept {
+  id          String       @id @default(cuid())
+  documentId  String
+  topicId     String?
+  term        String
+  definition  String
+  importance  String       @default("Medium") // High, Medium, Low
+  createdAt   DateTime     @default(now())
+
+  document    Document     @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  topic       Topic?       @relation(fields: [topicId], references: [id], onDelete: SetNull)
+}
+
+model Note {
+  id              String   @id @default(cuid())
+  documentId      String
+  topicId         String?
+  title           String
+  markdownContent String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  document        Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  topic           Topic?   @relation(fields: [topicId], references: [id], onDelete: SetNull)
+}
+
+model Flashcard {
+  id           String      @id @default(cuid())
+  documentId   String
+  topicId      String?
+  front        String
+  back         String
+  difficulty   String      @default("Medium") // Easy, Medium, Hard
+  reviewCount  Int         @default(0)
+  correctCount Int         @default(0)
+  createdAt    DateTime    @default(now())
+
+  document     Document    @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  topic        Topic?      @relation(fields: [topicId], references: [id], onDelete: SetNull)
+}
+
+model Question {
+  id            String       @id @default(cuid())
+  documentId    String
+  topicId       String?
+  type          String       @default("mcq") // mcq, conceptual
+  questionText  String
+  options       String       // JSON string array of options: ["A", "B", "C", "D"]
+  correctAnswer String
+  explanation   String
+  difficulty    String       @default("Medium") // Easy, Medium, Hard
+  createdAt     DateTime     @default(now())
+
+  document      Document     @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  topic         Topic?       @relation(fields: [topicId], references: [id], onDelete: SetNull)
+  answers       QuizAnswer[]
+}
+
+model QuizSession {
+  id             String       @id @default(cuid())
+  subjectId      String?
+  documentId     String?
+  title          String
+  totalQuestions Int          @default(0)
+  correctAnswers Int          @default(0)
+  scorePercentage Float       @default(0.0)
+  timeSpentSeconds Int        @default(0)
+  completedAt    DateTime     @default(now())
+  createdAt      DateTime     @default(now())
+
+  subject        Subject?     @relation(fields: [subjectId], references: [id], onDelete: SetNull)
+  document       Document?    @relation(fields: [documentId], references: [id], onDelete: SetNull)
+  answers        QuizAnswer[]
+}
+
+model QuizAnswer {
+  id             String      @id @default(cuid())
+  quizSessionId  String
+  questionId     String
+  selectedAnswer String
+  isCorrect      Boolean
+  createdAt      DateTime    @default(now())
+
+  quizSession    QuizSession @relation(fields: [quizSessionId], references: [id], onDelete: Cascade)
+  question       Question    @relation(fields: [questionId], references: [id], onDelete: Cascade)
+}
+
+model ActivityLog {
+  id          String   @id @default(cuid())
+  subjectId   String?
+  type        String   // 'UPLOAD', 'QUIZ_COMPLETED', 'NOTE_STUDIED', 'SUBJECT_CREATED', 'STUDY_MATERIAL_GENERATED'
+  description String
+  metadata    String?  // JSON formatted details
+  createdAt   DateTime @default(now())
+
+  subject     Subject? @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+}
+
+// -------------------------------------------------------------
+// ADVANCED AI ACADEMIC STUDY MATERIAL GENERATOR MODELS
+// -------------------------------------------------------------
+
+model CourseOutline {
+  id                 String        @id @default(cuid())
+  subjectId          String
+  title              String
+  fileName           String
+  fileType           String
+  filePath           String?
+  rawText            String
+  status             String        @default("PENDING") // PENDING, PARSED, FAILED
+  errorMessage       String?
+  learningObjectives String?       // JSON array of strings
+  expectedOutcomes   String?       // JSON array of strings
+  isActive           Boolean       @default(true)
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  subject            Subject       @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  units              OutlineUnit[]
+}
+
+model OutlineUnit {
+  id          String         @id @default(cuid())
+  outlineId   String
+  unitNumber  Int
+  title       String
+  description String?
+  orderIndex  Int            @default(0)
+  createdAt   DateTime       @default(now())
+
+  outline     CourseOutline  @relation(fields: [outlineId], references: [id], onDelete: Cascade)
+  topics      OutlineTopic[]
+}
+
+model OutlineTopic {
+  id                 String                            @id @default(cuid())
+  unitId             String
+  orderIndex         Int                               @default(0)
+  title              String
+  subtopics          String?                           // JSON string array
+  learningObjective  String?
+  coverageStatus     String                            @default("MISSING") // FULLY_COVERED, PARTIALLY_COVERED, MISSING
+  coverageNotes      String?
+  sourceCitations    String?                           // JSON string array of { documentId, documentTitle, pageOrSlide, relevance }
+  createdAt          DateTime                          @default(now())
+  updatedAt          DateTime                          @updatedAt
+
+  unit               OutlineUnit                       @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  studyMaterial      ComprehensiveTopicStudyMaterial?
+  questions          ExaminationQuestion[]
+  bookmarks          StudyBookmark[]
+  highlights         StudyHighlight[]
+}
+
+model ResourceChunk {
+  id                 String   @id @default(cuid())
+  documentId         String
+  pageOrSlideNumber  Int      @default(1)
+  sectionHeader      String?
+  content            String
+  createdAt          DateTime @default(now())
+
+  document           Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+}
+
+model ComprehensiveTopicStudyMaterial {
+  id                  String       @id @default(cuid())
+  topicId             String       @unique
+  introduction        String
+  detailedExplanation String
+  definitions         String       // JSON string array of { term, definition, source }
+  businessExamples    String       // JSON string array of { company, scenario, takeaway }
+  frameworksAndModels String       // JSON string array of { name, description, applicationSteps }
+  comparativeTables   String?      // Markdown table
+  keyTakeaways        String       // JSON string array
+  potentialQuestions  String       // JSON string array of { type: 'short' | 'long', question, modelAnswer }
+  sourceReferences    String       // JSON string array of cited documents & slide numbers
+  status              String       @default("GENERATED") // GENERATED, REGENERATING
+  version             Int          @default(1)
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+
+  topic               OutlineTopic @relation(fields: [topicId], references: [id], onDelete: Cascade)
+}
+
+model ExaminationQuestion {
+  id             String        @id @default(cuid())
+  topicId        String?
+  subjectId      String?
+  type           String        // 'MCQ' | 'CONCEPTUAL' | 'SHORT_ANSWER' | 'LONG_ANSWER' | 'CASE_STUDY'
+  questionText   String
+  options        String?       // JSON string array for MCQ
+  correctAnswer  String?       // For MCQ
+  modelAnswer    String?       // For conceptual, short, long, case
+  rubricCriteria String?       // JSON string array
+  difficulty     String        @default("Medium") // Easy, Medium, Hard
+  sourceCitations String?
+  createdAt      DateTime      @default(now())
+
+  topic          OutlineTopic? @relation(fields: [topicId], references: [id], onDelete: SetNull)
+}
+
+model StudyBookmark {
+  id        String       @id @default(cuid())
+  topicId   String
+  note      String?
+  createdAt DateTime     @default(now())
+
+  topic     OutlineTopic @relation(fields: [topicId], references: [id], onDelete: Cascade)
+}
+
+model StudyHighlight {
+  id              String       @id @default(cuid())
+  topicId         String
+  highlightedText String
+  color           String       @default("#fef08a") // yellow, green, blue
+  createdAt       DateTime     @default(now())
+
+  topic           OutlineTopic @relation(fields: [topicId], references: [id], onDelete: Cascade)
+}
