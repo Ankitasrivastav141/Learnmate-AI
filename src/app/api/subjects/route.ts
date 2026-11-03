@@ -41,9 +41,16 @@ export async function GET() {
     });
 
     return NextResponse.json(enrichedSubjects);
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error fetching subjects:', error);
-    return NextResponse.json({ error: 'Failed to fetch subjects' }, { status: 500 });
+    return NextResponse.json(
+      {
+        error: 'Failed to fetch subjects',
+        details: error?.message || String(error),
+        code: error?.code,
+      },
+      { status: 500 }
+    );
   }
 }
 
