@@ -40,7 +40,11 @@ export async function GET() {
       };
     });
 
-    return NextResponse.json(enrichedSubjects);
+    return NextResponse.json(enrichedSubjects, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+      },
+    });
   } catch (error: any) {
     console.error('Error fetching subjects:', error);
     return NextResponse.json(

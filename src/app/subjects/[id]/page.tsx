@@ -468,6 +468,7 @@ export default function SubjectDetailPage({ params }: { params: { id: string } }
             loadData();
           }}
           preselectedSubjectId={subject.id}
+          preselectedSubjectName={subject.name}
         />
       )}
     </div>

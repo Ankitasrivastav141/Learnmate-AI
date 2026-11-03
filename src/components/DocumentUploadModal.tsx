@@ -16,6 +16,7 @@ interface DocumentUploadModalProps {
   onClose: () => void;
   onSuccess: (newDocId?: string) => void;
   preselectedSubjectId?: string;
+  preselectedSubjectName?: string;
 }
 
 interface SubjectItem {
@@ -29,29 +30,47 @@ export function DocumentUploadModal({
   onClose,
   onSuccess,
   preselectedSubjectId,
+  preselectedSubjectName,
 }: DocumentUploadModalProps) {
   const [file, setFile] = useState<File | null>(null);
   const [title, setTitle] = useState('');
   const [selectedSubjectId, setSelectedSubjectId] = useState(preselectedSubjectId || '');
-  const [subjects, setSubjects] = useState<SubjectItem[]>([]);
+  const [subjects, setSubjects] = useState<SubjectItem[]>(() => {
+    if (preselectedSubjectId && preselectedSubjectName) {
+      return [{ id: preselectedSubjectId, name: preselectedSubjectName, color: '#652D3D' }];
+    }
+    return [];
+  });
   const [isUploading, setIsUploading] = useState(false);
   const [uploadStep, setUploadStep] = useState<'idle' | 'uploading' | 'extracting' | 'ai_synthesis' | 'done'>('idle');
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    fetch('/api/subjects')
+    if (preselectedSubjectId) {
+      setSelectedSubjectId(preselectedSubjectId);
+    }
+  }, [preselectedSubjectId]);
+
+  useEffect(() => {
+    fetch('/api/subjects', { cache: 'no-store' })
       .then((res) => res.json())
       .then((data) => {
         if (Array.isArray(data)) {
-          setSubjects(data);
-          if (!selectedSubjectId && data.length > 0) {
-            setSelectedSubjectId(data[0].id);
+          let list = [...data];
+          if (preselectedSubjectId && preselectedSubjectName && !list.some((s) => s.id === preselectedSubjectId)) {
+            list.unshift({ id: preselectedSubjectId, name: preselectedSubjectName, color: '#652D3D' });
+          }
+          setSubjects(list);
+          if (preselectedSubjectId) {
+            setSelectedSubjectId(preselectedSubjectId);
+          } else if (!selectedSubjectId && list.length > 0) {
+            setSelectedSubjectId(list[0].id);
           }
         }
       })
       .catch((err) => console.error('Failed to load subjects:', err));
-  }, [selectedSubjectId]);
+  }, [preselectedSubjectId, preselectedSubjectName]);
 
   if (!isOpen) return null;
 
