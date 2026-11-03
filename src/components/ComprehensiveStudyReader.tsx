@@ -99,8 +99,12 @@ export function ComprehensiveStudyReader({
   const [questionsList, setQuestionsList] = useState<any[]>([]);
   const [isGeneratingQuestions, setIsGeneratingQuestions] = useState(false);
 
-  // Collapsed unit navigation state
   const [collapsedUnits, setCollapsedUnits] = useState<Record<string, boolean>>({});
+
+  // AI Term Explainer state
+  const [lookupTerm, setLookupTerm] = useState('');
+  const [isLookingUp, setIsLookingUp] = useState(false);
+  const [termResult, setTermResult] = useState<any | null>(null);
 
   const contentRef = useRef<HTMLDivElement>(null);
 
@@ -182,6 +186,30 @@ export function ComprehensiveStudyReader({
       console.error('Error generating questions:', err);
     } finally {
       setIsGeneratingQuestions(false);
+    }
+  };
+
+  const handleLookupTerm = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!lookupTerm.trim()) return;
+    setIsLookingUp(true);
+    try {
+      const res = await fetch('/api/ai/define-term', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          term: lookupTerm,
+          context: selectedTopicData?.studyMaterial?.detailedExplanation || '',
+        }),
+      });
+      const data = await res.json();
+      if (!data.error) {
+        setTermResult(data);
+      }
+    } catch (err) {
+      console.error('Failed to define term:', err);
+    } finally {
+      setIsLookingUp(false);
     }
   };
 
@@ -495,6 +523,99 @@ export function ComprehensiveStudyReader({
                 </button>
               </div>
 
+              {/* Instant AI Term Explainer Toolbar */}
+              <div className="bg-[#FAF7F2] border border-[#E5DCD0] rounded-2xl p-4 shadow-sm space-y-3">
+                <form onSubmit={handleLookupTerm} className="flex flex-col sm:flex-row items-center gap-2.5">
+                  <div className="relative flex-1 w-full">
+                    <Search className="w-4 h-4 text-[#652D3D] absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      value={lookupTerm}
+                      onChange={(e) => setLookupTerm(e.target.value)}
+                      placeholder="Type ANY slide term or acronym to define with AI (e.g. Preemptive Scheduling, FIFO, EBITDA)..."
+                      className="w-full pl-10 pr-4 py-2 rounded-xl bg-white border border-[#DED4C7] text-xs text-[#252222] placeholder:text-[#6E5D59]/60 focus:outline-none focus:border-[#652D3D] shadow-sm"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={isLookingUp || !lookupTerm.trim()}
+                    className="w-full sm:w-auto px-4 py-2 rounded-xl bg-[#652D3D] hover:bg-[#7b374a] text-[#F3EDE3] text-xs font-semibold flex items-center justify-center gap-2 shadow-sm transition-all disabled:opacity-50 cursor-pointer"
+                  >
+                    {isLookingUp ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" /> Defining with AI...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-3.5 h-3.5" /> Define Term with AI
+                      </>
+                    )}
+                  </button>
+                </form>
+
+                {/* Instant Term Result Card */}
+                {termResult && (
+                  <div className="bg-white border-2 border-[#652D3D] rounded-xl p-5 space-y-3 animate-in fade-in duration-200 relative shadow-md">
+                    <button
+                      onClick={() => setTermResult(null)}
+                      className="absolute top-3 right-3 text-xs text-[#6E5D59] hover:text-[#252222] font-semibold cursor-pointer px-2 py-0.5 rounded bg-[#FAF7F2] border border-[#E5DCD0]"
+                      title="Close"
+                    >
+                      ✕ Close
+                    </button>
+
+                    <div className="flex items-center gap-2.5 flex-wrap">
+                      <span className="text-sm font-bold text-[#652D3D]">{termResult.term}</span>
+                      {termResult.acronymExpansion && (
+                        <span className="text-xs px-2 py-0.5 rounded bg-[#652D3D]/10 text-[#652D3D] font-mono border border-[#652D3D]/20">
+                          {termResult.acronymExpansion}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="space-y-2 text-xs">
+                      <div>
+                        <span className="font-bold text-[#252222] block mb-0.5">Formal Academic Definition:</span>
+                        <p className="text-[#4F4240] leading-relaxed">{termResult.formalDefinition}</p>
+                      </div>
+
+                      <div className="p-3 rounded-lg bg-[#FAF7F2] border border-[#E5DCD0]">
+                        <span className="font-bold text-[#652D3D] block mb-0.5">💡 In Plain English (Why It Matters):</span>
+                        <p className="text-[#252222] leading-relaxed">{termResult.plainEnglishExplanation}</p>
+                      </div>
+
+                      {termResult.coreMechanics && termResult.coreMechanics.length > 0 && (
+                        <div>
+                          <span className="font-bold text-[#252222] block mb-1">⚙️ Core Mechanics:</span>
+                          <ul className="list-disc pl-5 space-y-0.5 text-[#4F4240]">
+                            {termResult.coreMechanics.map((mech: string, mIdx: number) => (
+                              <li key={mIdx}>{mech}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {termResult.realWorldExample && (
+                        <div className="p-2.5 rounded-lg bg-[#FFF9F6] border border-[#F3D7CC]">
+                          <span className="font-bold text-[#252222] block mb-0.5">🏢 Real-World Example:</span>
+                          <p className="text-[#4F4240] leading-relaxed">
+                            <span className="font-semibold text-[#252222]">{termResult.realWorldExample.scenario} </span>
+                            {termResult.realWorldExample.howItApplies}
+                          </p>
+                        </div>
+                      )}
+
+                      {termResult.examAlert && (
+                        <div className="p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-800">
+                          <span className="font-bold block mb-0.5">🎯 Examination Alert:</span>
+                          <p className="leading-relaxed">{termResult.examAlert}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {activeQuestionTab === 'study' ? (
                 <>
                   {/* SECTION A: INTRODUCTION */}
@@ -523,32 +644,64 @@ export function ComprehensiveStudyReader({
                     </div>
                   </section>
 
-                  {/* SECTION C: IMPORTANT DEFINITIONS */}
+                  {/* SECTION C: IMPORTANT DEFINITIONS & SLIDE TERMINOLOGY */}
                   {definitions.length > 0 && (
-                    <section className="space-y-3">
-                      <h2 className="text-base font-bold uppercase tracking-wider text-[#252222] flex items-center gap-2">
-                        <span className="w-6 h-6 rounded-md bg-[#652D3D] text-[#F3EDE3] flex items-center justify-center text-xs font-mono">
-                          C
+                    <section className="space-y-4">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <h2 className="text-base font-bold uppercase tracking-wider text-[#252222] flex items-center gap-2">
+                          <span className="w-6 h-6 rounded-md bg-[#652D3D] text-[#F3EDE3] flex items-center justify-center text-xs font-mono">
+                            C
+                          </span>
+                          Comprehensive Slide Terminology & Defined Glossary ({definitions.length} Terms)
+                        </h2>
+                        <span className="text-xs text-[#6E5D59]">
+                          Every term, model & acronym defined with plain-English context
                         </span>
-                        Important Definitions & Terminology
-                      </h2>
+                      </div>
+
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {definitions.map((def: any, idx: number) => (
                           <div
                             key={idx}
-                            className="bg-[#FAF7F2] border border-[#E5DCD0] rounded-xl p-5 space-y-2 hover:border-[#B58B83] transition-colors shadow-sm"
+                            className="bg-white border border-[#E5DCD0] rounded-xl p-5 space-y-3 hover:border-[#652D3D] transition-all shadow-sm"
                           >
-                            <div className="flex items-center justify-between">
-                              <h4 className="text-sm font-bold text-[#252222]">{def.term}</h4>
+                            <div className="flex items-start justify-between gap-2">
+                              <div>
+                                <h4 className="text-sm font-bold text-[#652D3D] flex items-center gap-1.5">
+                                  {def.term}
+                                  {def.acronym && (
+                                    <span className="text-[10px] font-normal text-[#6E5D59]">
+                                      ({def.acronym})
+                                    </span>
+                                  )}
+                                </h4>
+                              </div>
                               {def.source && (
-                                <span className="text-[10px] text-[#652D3D] font-mono font-medium">
+                                <span className="text-[10px] text-[#652D3D] font-mono font-semibold px-2 py-0.5 rounded bg-[#FAF7F2] border border-[#E5DCD0] shrink-0">
                                   {def.source}
                                 </span>
                               )}
                             </div>
-                            <p className="text-xs text-[#4F4240] leading-relaxed">
+
+                            <p className="text-xs text-[#252222] font-medium leading-relaxed">
                               {def.definition}
                             </p>
+
+                            {def.plainEnglishExplanation && (
+                              <div className="p-2.5 rounded-lg bg-[#FAF7F2] border border-[#E5DCD0] text-xs text-[#4F4240] space-y-1">
+                                <span className="font-semibold text-[#652D3D] block text-[11px] uppercase tracking-wider">
+                                  💡 In Plain English & Why It Matters:
+                                </span>
+                                <p className="leading-relaxed">{def.plainEnglishExplanation}</p>
+                              </div>
+                            )}
+
+                            {def.practicalContext && (
+                              <div className="text-[11px] text-[#6E5D59] bg-[#FFF9F6] border border-[#F3D7CC] p-2 rounded-lg">
+                                <span className="font-semibold text-[#252222]">🏢 Application: </span>
+                                {def.practicalContext}
+                              </div>
+                            )}
                           </div>
                         ))}
                       </div>

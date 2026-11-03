@@ -4,7 +4,14 @@ import { prisma } from './prisma';
 export interface ComprehensiveTopicContent {
   introduction: string;
   detailedExplanation: string;
-  definitions: Array<{ term: string; definition: string; source?: string }>;
+  definitions: Array<{
+    term: string;
+    acronym?: string;
+    definition: string;
+    plainEnglishExplanation?: string;
+    practicalContext?: string;
+    source?: string;
+  }>;
   businessExamples: Array<{ companyOrContext: string; scenario: string; takeaway: string }>;
   frameworksAndModels: Array<{ name: string; description: string; applicationSteps: string }>;
   comparativeTables: string; // Markdown table
@@ -161,6 +168,7 @@ ${contextBlocks.slice(0, 40000)}
 """
 
 CRITICAL REQUIREMENTS:
+- EXHAUSTIVE TERMINOLOGY IDENTIFICATION: Scrutinize every slide, page, and chunk. Identify EVERY key term, acronym, framework, methodology, model, law, principle, or jargon word mentioned.
 - DO NOT produce brief bullet summaries or superficial overviews.
 - Write extensive, coherent, book-quality paragraphs suitable for graduate / MBA-level exam preparation.
 - Explicitly cite source documents using format [DocName, Slide/Page X] whenever drawing factual statements from the uploaded material.
@@ -171,12 +179,15 @@ CRITICAL REQUIREMENTS:
 Output MUST be a valid JSON object matching this exact schema:
 {
   "introduction": "Comprehensive 2-3 paragraph academic introduction explaining importance, historical context, and role in modern business/systems.",
-  "detailedExplanation": "Deep, multi-paragraph conceptual exposition thoroughly breaking down each subtopic. Convert fragmented bullet points into continuous, rigorous academic narrative.",
+  "detailedExplanation": "Deep, multi-paragraph conceptual exposition thoroughly breaking down each subtopic. Convert fragmented bullet points into continuous, rigorous academic narrative with clear mechanisms, workflows, and theoretical context.",
   "definitions": [
     {
-      "term": "Term Name",
+      "term": "Term Name (e.g., Preemptive Scheduling / EBITDA)",
+      "acronym": "Expanded form if abbreviation, or null",
       "definition": "Precise, formal academic definition.",
-      "source": "Document Citation or Standard Academic Framework"
+      "plainEnglishExplanation": "Intuitive, simple explanation of how and why it works so any learner instantly understands it.",
+      "practicalContext": "Real-world business or engineering operational context.",
+      "source": "Document Citation or Slide reference (e.g. Slide 4)"
     }
   ],
   "businessExamples": [

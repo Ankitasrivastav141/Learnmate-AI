@@ -20,6 +20,10 @@ import {
   Loader2,
   Clock,
   Layers,
+  Search,
+  BookMarked,
+  Lightbulb,
+  X,
 } from 'lucide-react';
 import { FlashcardDeck } from '@/components/FlashcardDeck';
 import { QuizRunner } from '@/components/QuizRunner';
@@ -94,6 +98,44 @@ export default function DocumentStudyHubPage({ params }: { params: { id: string 
   const [quizSessionId, setQuizSessionId] = useState<string | null>(null);
   const [quizQuestions, setQuizQuestions] = useState<any[]>([]);
   const [isStartingQuiz, setIsStartingQuiz] = useState(false);
+
+  // AI Term Explainer state
+  const [lookupTerm, setLookupTerm] = useState('');
+  const [isLookingUp, setIsLookingUp] = useState(false);
+  const [termResult, setTermResult] = useState<{
+    term: string;
+    definition: string;
+    plainEnglish: string;
+    keyMechanics: string[];
+    realWorldExample: string;
+    commonPitfall: string;
+    citations: string;
+  } | null>(null);
+
+  const handleLookupTerm = async (termToLookup?: string) => {
+    const target = (termToLookup || lookupTerm).trim();
+    if (!target) return;
+    if (termToLookup) setLookupTerm(termToLookup);
+    setIsLookingUp(true);
+    try {
+      const res = await fetch('/api/ai/define-term', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          term: target,
+          context: `Document: ${doc?.title || ''}. Subject: ${doc?.subject?.name || ''}`
+        })
+      });
+      const data = await res.json();
+      if (data && !data.error) {
+        setTermResult(data);
+      }
+    } catch (e) {
+      console.error('Failed to lookup term:', e);
+    } finally {
+      setIsLookingUp(false);
+    }
+  };
 
   const loadDocument = () => {
     setIsLoading(true);
@@ -343,6 +385,119 @@ export default function DocumentStudyHubPage({ params }: { params: { id: string 
         </div>
       )}
 
+      {/* On-Demand AI Term Explainer Toolbar for Notes and Concepts */}
+      {(activeTab === 'notes' || activeTab === 'concepts') && (
+        <div className="bg-white border border-[#E5DCD0] rounded-2xl p-5 shadow-sm space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="space-y-0.5">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-[#652D3D]" />
+                <h4 className="text-sm font-bold text-[#252222]">AI Term & Acronym Explainer</h4>
+                <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-[#652D3D]/10 text-[#652D3D]">
+                  On-Demand AI
+                </span>
+              </div>
+              <p className="text-xs text-[#6E5D59]">
+                Look up any slide term, formula, acronym, or model for instant textbook-grade academic definitions and plain-English intuition.
+              </p>
+            </div>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleLookupTerm();
+              }}
+              className="flex items-center gap-2 w-full sm:w-auto"
+            >
+              <div className="relative flex-1 sm:w-72">
+                <Search className="w-3.5 h-3.5 text-[#6E5D59] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  type="text"
+                  placeholder="e.g. EBITDA, Backprop, VRIO, CAPM..."
+                  value={lookupTerm}
+                  onChange={(e) => setLookupTerm(e.target.value)}
+                  className="w-full pl-9 pr-3 py-1.5 rounded-xl border border-[#DED4C7] bg-[#FAF7F2] text-xs text-[#252222] focus:outline-none focus:ring-2 focus:ring-[#652D3D]/20 focus:border-[#652D3D] transition-all"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={isLookingUp || !lookupTerm.trim()}
+                className="px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-[#652D3D] hover:bg-[#4E222F] text-[#F3EDE3] transition-colors disabled:opacity-50 cursor-pointer flex items-center gap-1.5 shrink-0 shadow-sm"
+              >
+                {isLookingUp ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" /> Defining...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-3.5 h-3.5" /> Define
+                  </>
+                )}
+              </button>
+            </form>
+          </div>
+
+          {/* AI Definition Result Card */}
+          {termResult && (
+            <div className="bg-[#FAF7F2] border border-[#652D3D]/30 rounded-xl p-4 space-y-3 animate-in fade-in-50 duration-200">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h5 className="text-base font-bold text-[#652D3D]">{termResult.term}</h5>
+                    <span className="text-[10px] font-mono bg-white px-2 py-0.5 rounded border border-[#E5DCD0] text-[#6E5D59]">
+                      {termResult.citations || 'Academic Standard Definition'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-[#252222] font-serif leading-relaxed mt-1">
+                    {termResult.definition}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setTermResult(null)}
+                  className="text-[#6E5D59] hover:text-[#252222] p-1 rounded-md hover:bg-white transition-colors cursor-pointer"
+                  title="Dismiss"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {termResult.plainEnglish && (
+                <div className="bg-amber-50/70 border border-amber-200/80 rounded-lg p-2.5 flex items-start gap-2">
+                  <Lightbulb className="w-3.5 h-3.5 text-amber-700 shrink-0 mt-0.5" />
+                  <div className="text-[11px] text-amber-900 leading-relaxed">
+                    <strong className="font-semibold text-amber-950">In Plain English:</strong> {termResult.plainEnglish}
+                  </div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1 text-[11px]">
+                {termResult.keyMechanics && termResult.keyMechanics.length > 0 && (
+                  <div className="bg-white border border-[#E5DCD0] rounded-lg p-2.5 space-y-1">
+                    <span className="font-semibold text-[#252222] block">⚙️ How It Works:</span>
+                    <ul className="list-disc pl-4 space-y-0.5 text-[#4F4240]">
+                      {termResult.keyMechanics.map((step, idx) => (
+                        <li key={idx}>{step}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {termResult.realWorldExample && (
+                  <div className="bg-white border border-[#E5DCD0] rounded-lg p-2.5 space-y-1">
+                    <span className="font-semibold text-[#252222] block">🌍 Real-World Application:</span>
+                    <p className="text-[#4F4240] leading-relaxed">{termResult.realWorldExample}</p>
+                  </div>
+                )}
+              </div>
+
+              {termResult.commonPitfall && (
+                <div className="text-[11px] text-red-900 bg-red-50/70 border border-red-200/70 rounded-lg p-2">
+                  <strong>⚠️ Common Exam Pitfall:</strong> {termResult.commonPitfall}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* TAB 1: STUDY NOTES */}
       {activeTab === 'notes' && (
         <div className="space-y-6">
@@ -408,6 +563,18 @@ export default function DocumentStudyHubPage({ params }: { params: { id: string 
                   </span>
                 </div>
                 <p className="text-xs text-[#4F4240] leading-relaxed">{concept.definition}</p>
+                <div className="pt-2 border-t border-[#F3EDE3] flex items-center justify-end">
+                  <button
+                    onClick={() => {
+                      handleLookupTerm(concept.term);
+                      window.scrollTo({ top: 320, behavior: 'smooth' });
+                    }}
+                    className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#652D3D] hover:text-[#4E222F] transition-colors cursor-pointer"
+                  >
+                    <Sparkles className="w-3 h-3" />
+                    Deep Explain with AI
+                  </button>
+                </div>
               </div>
             ))
           ) : (

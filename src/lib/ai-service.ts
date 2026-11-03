@@ -71,43 +71,44 @@ async function generateWithGemini(
   const truncatedText = rawText.slice(0, 60000);
 
   const prompt = `
-You are the AI Learning Engine for LearnMate AI, an expert academic tutor and curriculum designer.
+You are the AI Chief Academic Tutor and Curriculum Specialist for LearnMate AI.
 Analyze the following academic document titled "${title}".
-Extract and structure a complete learning pack strictly grounded in the document text.
+The user needs comprehensive, deeply educational study notes—NOT superficial bullet points or brief summaries.
+Every slide or section in a PPT/document contains critical terminology, models, and acronyms that must be clearly explained so that the study notes are genuinely worth reading and sufficient for university/MBA exam mastery.
 
-Document Text:
+Document Content:
 """
 ${truncatedText}
 """
 
 You MUST output ONLY a valid JSON object matching this exact structure:
 {
-  "summary": "A clear 2-3 sentence executive summary of the document's core subject matter.",
+  "summary": "Comprehensive 3-4 sentence academic overview explaining the document's core principles, scope, and strategic/technical value.",
   "topics": [
     {
-      "title": "Topic Title",
-      "summary": "Brief 1-2 sentence description of what this section covers."
+      "title": "Clear Topic / Unit Name",
+      "summary": "Detailed summary explaining what principles and mechanisms this topic encompasses."
     }
   ],
   "concepts": [
     {
-      "term": "Key Concept or Term",
-      "definition": "Clear, precise academic definition grounded in the text.",
+      "term": "Term Name (e.g. Preemptive Scheduling, EBITDA, ACID Properties)",
+      "definition": "Clear, precise academic definition explaining what it is, how it works in plain English, and why it matters.",
       "importance": "High", // "High", "Medium", or "Low"
       "topicIndex": 0 // 0-based index linking to the topics array
     }
   ],
   "notes": [
     {
-      "title": "Comprehensive Study Notes: [Topic Name]",
-      "markdownContent": "Rich GitHub-flavored markdown notes with ## Headers, bullet points, key takeaways, formulas/theories, and summary tables where relevant.",
+      "title": "Mastery Study Guide: [Topic Name]",
+      "markdownContent": "Extensive, highly readable academic study guide in GitHub-flavored markdown. MUST include:\\n\\n## 1. Deep Conceptual Foundations & Theory\\nExtensive narrative explaining the core concepts thoroughly (avoiding superficial bullet points).\\n\\n## 2. Complete Slide Terminology & Glossary\\nStructured definitions for EVERY term, acronym, and framework mentioned in these slides:\\n| Term / Acronym | Rigorous Definition | In Plain English & Why It Matters |\\n|---|---|---|\\n| ... | ... | ... |\\n\\n## 3. Mechanisms, Architecture & Step-by-Step Logic\\nClear breakdown of processes, mathematical/logical criteria, and operational workflows.\\n\\n## 4. Practical Industry Context & Real-World Application\\nConcrete business or engineering scenario showing how this works in practice.\\n\\n## 5. Comparative Trade-offs & Alternatives\\nTable comparing different approaches, algorithms, or strategies.\\n\\n## 6. High-Yield Examination Prep & Common Pitfalls\\nKey questions and common student mistakes to avoid in exams.",
       "topicIndex": 0
     }
   ],
   "flashcards": [
     {
-      "front": "Prompt, question, or term to define",
-      "back": "Accurate, concise explanation or definition",
+      "front": "Specific term, acronym, or mechanism prompt",
+      "back": "Accurate, clear definition and explanation grounded in the text",
       "difficulty": "Medium", // "Easy", "Medium", or "Hard"
       "topicIndex": 0
     }
@@ -115,23 +116,22 @@ You MUST output ONLY a valid JSON object matching this exact structure:
   "questions": [
     {
       "type": "mcq",
-      "questionText": "Clear, unambiguous question testing comprehension of a concept from the text",
+      "questionText": "Rigorous academic question testing comprehension of definitions, mechanisms, or trade-offs",
       "options": ["Option A", "Option B", "Option C", "Option D"],
       "correctAnswer": "Option A", // Must exactly match one of the items in options
-      "explanation": "Detailed explanation of why this answer is correct, citing information from the document.",
+      "explanation": "Detailed explanation citing the underlying academic rationale.",
       "difficulty": "Medium", // "Easy", "Medium", or "Hard"
       "topicIndex": 0
     }
   ]
 }
 
-REQUIREMENTS:
-- Generate 3 to 6 distinct topics.
-- Extract 5 to 10 core concepts.
-- Provide comprehensive Markdown notes for each major topic.
-- Generate at least 8-12 high quality flashcards.
-- Generate at least 10 high-quality 4-option MCQs. Each MCQ MUST have exactly 4 plausible choices, with the correctAnswer matching one choice exactly.
-- Ground all facts strictly in the provided text.
+CRITICAL INSTRUCTIONS:
+- Identify and define EVERY significant academic term, acronym, and model found across the slides (generate at least 15 to 25 distinct concepts).
+- For each topic, write substantive, coherent, educational prose—DO NOT simply replicate telegraphic slide bullets.
+- Generate at least 10 high-quality flashcards.
+- Generate 10 high-yield, 4-option MCQs with thorough explanations.
+- Ensure all content is strictly grounded in the uploaded material.
 `;
 
   const result = await model.generateContent(prompt);
@@ -193,58 +193,95 @@ function generateWithSemanticEngine(
     summary: `Explores foundational elements and critical principles related to ${t} as presented in the study material.`,
   }));
 
-  // Concepts extraction
-  const conceptTerms = [
-    'Core Architecture',
-    'Underlying Principles',
-    'Process Optimization',
-    'Primary Framework',
-    'Theoretical Foundation',
-    'Key Variables',
-    'Operational Flow',
-    'Evaluation Metrics',
-  ];
+  // Extract genuine technical terms & definitions from text patterns
+  // (e.g. "Term: definition", "Term - definition", "Term is a ...")
+  const extractedTerms: Array<{ term: string; definition: string }> = [];
+  const termRegex = /(?:^|\n)\s*([A-Z][A-Za-z0-9\s-]{2,40}?)\s*(?::|—|-|\bis\s+a\b|\brefers\s+to\b)\s*([^\n.]{15,200}\.?)/g;
+  let match;
+  while ((match = termRegex.exec(rawText)) !== null) {
+    const rawTerm = match[1].trim();
+    const rawDef = match[2].trim();
+    if (rawTerm.length > 2 && !rawTerm.toLowerCase().includes('slide') && !extractedTerms.some((t) => t.term === rawTerm)) {
+      extractedTerms.push({
+        term: rawTerm,
+        definition: rawDef.endsWith('.') ? rawDef : `${rawDef}.`,
+      });
+    }
+    if (extractedTerms.length >= 25) break;
+  }
 
-  const concepts = conceptTerms.slice(0, 6).map((term, i) => {
-    const matchedSentence = sentences.find((s) => s.toLowerCase().includes(term.toLowerCase().split(' ')[0])) ||
-      sentences[i % Math.max(1, sentences.length)] ||
-      `Essential concept defined in ${title} representing core mechanisms and analytical criteria.`;
-    return {
-      term: `${term}`,
-      definition: matchedSentence,
-      importance: (i % 2 === 0 ? 'High' : 'Medium') as 'High' | 'Medium' | 'Low',
-      topicIndex: i % topics.length,
-    };
-  });
+  // Also extract prominent capitalized phrases / acronyms
+  if (extractedTerms.length < 10) {
+    const acronyms = Array.from(new Set(rawText.match(/\b[A-Z]{2,6}\b/g) || []));
+    for (const ac of acronyms.slice(0, 10)) {
+      if (!extractedTerms.some((t) => t.term === ac)) {
+        const sentence = sentences.find((s) => s.includes(ac)) || `Key domain acronym identified in ${title}.`;
+        extractedTerms.push({
+          term: ac,
+          definition: sentence,
+        });
+      }
+    }
+  }
 
-  // Notes Generation
+  // Fallback defaults if text was extremely terse
+  if (extractedTerms.length === 0) {
+    extractedTerms.push(
+      { term: `${title} Architecture`, definition: `The structural composition and governing operational parameters of ${title}.` },
+      { term: `Operational Protocol`, definition: `Rules specifying message exchange, event handling, and state transitions.` },
+      { term: `Systemic Optimization`, definition: `Methodologies applied to improve throughput, latency, and resource utilization.` }
+    );
+  }
+
+  const concepts = extractedTerms.slice(0, 15).map((et, i) => ({
+    term: et.term,
+    definition: et.definition,
+    importance: (i % 2 === 0 ? 'High' : 'Medium') as 'High' | 'Medium' | 'Low',
+    topicIndex: i % topics.length,
+  }));
+
+  // Notes Generation with exhaustive term definition tables
   const notes = topics.map((topic, i) => {
+    const topicTerms = concepts.filter((c) => c.topicIndex === i);
+    const termsTable = topicTerms.length > 0
+      ? `| Term / Concept | Academic Definition & Practical Role |\n|---|---|\n${topicTerms.map((t) => `| **${t.term}** | ${t.definition} |`).join('\n')}`
+      : `| Concept | Definition |\n|---|---|\n| **${topic.title}** | Fundamental domain framework governing core principles in ${title}. |`;
+
     const relevantParagraphs = paragraphs.slice(i * 2, i * 2 + 3);
     const contentBody = relevantParagraphs.length > 0
-      ? relevantParagraphs.map((p) => `> ${p}`).join('\n\n')
-      : `This section details the primary tenets of **${topic.title}**. The source material establishes key operational rules, systemic logic, and structural dependencies.`;
+      ? relevantParagraphs.join('\n\n')
+      : `This section details the primary operational tenets of **${topic.title}**. The source material establishes key operational rules, systemic logic, and structural dependencies.`;
 
     const markdown = `
 # ${topic.title}
 
-## Overview & Context
-${topic.summary}
-
-## Key Tenets & Core Principles
+## 1. Conceptual Overview & Deep Theory
 ${contentBody}
 
-### Important Takeaways
-* **Primary Focus:** Rigorous conceptual mastery and application within academic context.
-* **Critical Relationship:** How ${topic.title} intersects with broader course objectives.
-* **Review Check:** Be prepared to analyze edge cases and practical implementations.
+## 2. Key Slide Terminology & Defined Glossary
+The following terms, acronyms, and operational criteria were identified in the source material for this topic:
 
-\`\`\`
-Source Material Reference: ${title} — Section ${i + 1}
-\`\`\`
+${termsTable}
+
+## 3. Core Mechanisms & Step-by-Step Logic
+* **Operational Flow:** How components interact under standard baseline conditions.
+* **State Transitions:** Handling input triggers, throughput constraints, and edge exceptions.
+* **Evaluation Metrics:** Quantifiable criteria used to measure stability and accuracy.
+
+## 4. Practical Industry Context & Business Impact
+In real-world business and technological environments, mastering **${topic.title}** allows organizations to eliminate operational bottlenecks, ensure compliance with quality standards, and scale systems efficiently.
+
+## 5. High-Yield Examination Prep
+* **Essential Question:** Define **${topicTerms[0]?.term || topic.title}** and analyze its primary trade-offs.
+* **Model Answer:** ${topicTerms[0]?.definition || topic.summary} Citing constraints and alternatives improves rubric performance.
+* **Common Student Pitfall:** Conflating preliminary definitions with comprehensive operational models.
+
+---
+*Source Material Provenance: ${title} — Unit / Module ${i + 1}*
 `.trim();
 
     return {
-      title: `${topic.title} - Detailed Study Notes`,
+      title: `${topic.title} - Comprehensive Study Guide`,
       markdownContent: markdown,
       topicIndex: i,
     };
