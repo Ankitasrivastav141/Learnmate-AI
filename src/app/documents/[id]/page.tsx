@@ -480,10 +480,15 @@ export default function DocumentStudyHubPage({ params }: { params: { id: string 
                     </ul>
                   </div>
                 )}
-                {termResult.realWorldExample && (
+                {(termResult.realWorldExampleText || termResult.realWorldExample) && (
                   <div className="bg-white border border-[#E5DCD0] rounded-lg p-2.5 space-y-1">
                     <span className="font-semibold text-[#252222] block">🌍 Real-World Application:</span>
-                    <p className="text-[#4F4240] leading-relaxed">{termResult.realWorldExample}</p>
+                    <p className="text-[#4F4240] leading-relaxed">
+                      {termResult.realWorldExampleText ||
+                        (typeof termResult.realWorldExample === 'object'
+                          ? `${termResult.realWorldExample?.scenario || ''} ${termResult.realWorldExample?.howItApplies || ''}`.trim()
+                          : termResult.realWorldExample)}
+                    </p>
                   </div>
                 )}
               </div>
