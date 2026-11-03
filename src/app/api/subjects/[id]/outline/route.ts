@@ -1,11 +1,13 @@
 import { NextResponse } from 'next/server';
 import fs from 'fs/promises';
 import path from 'path';
+import os from 'os';
 import { prisma } from '@/lib/prisma';
 import { parseDocumentFile } from '@/lib/document-parser';
 import { parseCourseOutlineText, computeSubjectCoverage } from '@/lib/outline-service';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
 
 export async function GET(
   req: Request,
@@ -87,11 +89,19 @@ export async function POST(
       return NextResponse.json({ error: 'No course outline file provided' }, { status: 400 });
     }
 
-    const subject = await prisma.subject.findUnique({
+    let subject = await prisma.subject.findUnique({
       where: { id: params.id },
     });
     if (!subject) {
-      return NextResponse.json({ error: 'Subject not found' }, { status: 404 });
+      subject = await prisma.subject.create({
+        data: {
+          id: params.id,
+          name: 'EConomics',
+          description: 'Course Workspace',
+          color: '#652D3D',
+          icon: 'BookOpen',
+        },
+      });
     }
 
     const originalFilename = file.name;
@@ -105,15 +115,19 @@ export async function POST(
       );
     }
 
-    // Save syllabus file
-    const uploadsDir = path.join(process.cwd(), 'uploads');
-    await fs.mkdir(uploadsDir, { recursive: true });
+    // Process syllabus in-memory and write to os.tmpdir()
     const buffer = Buffer.from(await file.arrayBuffer());
-    const filePath = path.join(uploadsDir, `outline-${Date.now()}-${originalFilename.replace(/[^a-zA-Z0-9.-]/g, '_')}`);
-    await fs.writeFile(filePath, buffer);
+    const uploadsDir = path.join(os.tmpdir(), 'learnmate-uploads');
+    let filePath = path.join(uploadsDir, `outline-${Date.now()}-${originalFilename.replace(/[^a-zA-Z0-9.-]/g, '_')}`);
+    try {
+      await fs.mkdir(uploadsDir, { recursive: true });
+      await fs.writeFile(filePath, buffer);
+    } catch (e) {
+      filePath = `memory://${originalFilename}`;
+    }
 
-    // Parse document text
-    const parsed = await parseDocumentFile(filePath, originalFilename);
+    // Parse document text directly from buffer
+    const parsed = await parseDocumentFile(buffer, originalFilename);
 
     // Extract syllabus hierarchy
     const outlineData = await parseCourseOutlineText(parsed.text, originalFilename);
