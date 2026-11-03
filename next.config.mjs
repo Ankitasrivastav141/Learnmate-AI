@@ -2,6 +2,9 @@
 const nextConfig = {
   experimental: {
     serverComponentsExternalPackages: ['officeparser', 'pdf-parse', 'mammoth'],
+    outputFileTracingIncludes: {
+      '/api/**/*': ['./prisma/dev.db'],
+    },
   },
   webpack: (config) => {
     config.resolve.alias.canvas = false;
