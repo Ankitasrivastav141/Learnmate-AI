@@ -1,7 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   experimental: {
-    serverComponentsExternalPackages: ['officeparser', 'pdf-parse', 'mammoth'],
+    serverComponentsExternalPackages: ['officeparser', 'pdf-parse', 'mammoth', 'yauzl'],
     outputFileTracingIncludes: {
       '/api/**/*': ['./prisma/dev.db'],
     },

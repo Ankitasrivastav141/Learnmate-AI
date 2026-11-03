@@ -102,15 +102,7 @@ export default function DocumentStudyHubPage({ params }: { params: { id: string 
   // AI Term Explainer state
   const [lookupTerm, setLookupTerm] = useState('');
   const [isLookingUp, setIsLookingUp] = useState(false);
-  const [termResult, setTermResult] = useState<{
-    term: string;
-    definition: string;
-    plainEnglish: string;
-    keyMechanics: string[];
-    realWorldExample: string;
-    commonPitfall: string;
-    citations: string;
-  } | null>(null);
+  const [termResult, setTermResult] = useState<any | null>(null);
 
   const handleLookupTerm = async (termToLookup?: string) => {
     const target = (termToLookup || lookupTerm).trim();
@@ -474,7 +466,7 @@ export default function DocumentStudyHubPage({ params }: { params: { id: string 
                   <div className="bg-white border border-[#E5DCD0] rounded-lg p-2.5 space-y-1">
                     <span className="font-semibold text-[#252222] block">⚙️ How It Works:</span>
                     <ul className="list-disc pl-4 space-y-0.5 text-[#4F4240]">
-                      {termResult.keyMechanics.map((step, idx) => (
+                      {termResult.keyMechanics.map((step: string, idx: number) => (
                         <li key={idx}>{step}</li>
                       ))}
                     </ul>

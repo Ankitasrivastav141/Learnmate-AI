@@ -1,9 +1,13 @@
 import { NextResponse } from 'next/server';
 import fs from 'fs/promises';
 import path from 'path';
+import os from 'os';
 import { prisma } from '@/lib/prisma';
 import { parseDocumentFile } from '@/lib/document-parser';
 import { generateLearningMaterialFromDocument } from '@/lib/ai-service';
+
+export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
 
 export async function POST(req: Request) {
   try {
@@ -39,17 +43,21 @@ export async function POST(req: Request) {
       );
     }
 
-    // Create uploads directory if it doesn't exist
-    const uploadsDir = path.join(process.cwd(), 'uploads');
-    await fs.mkdir(uploadsDir, { recursive: true });
-
-    // Generate unique file path
+    // Process file in memory buffer
     const fileBytes = await file.arrayBuffer();
     const buffer = Buffer.from(fileBytes);
     const uniqueFileName = `${Date.now()}-${originalFilename.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
-    const filePath = path.join(uploadsDir, uniqueFileName);
 
-    await fs.writeFile(filePath, buffer);
+    // Use writable OS temp directory (works everywhere including Vercel /tmp)
+    const uploadsDir = path.join(os.tmpdir(), 'learnmate-uploads');
+    let filePath = path.join(uploadsDir, uniqueFileName);
+    try {
+      await fs.mkdir(uploadsDir, { recursive: true });
+      await fs.writeFile(filePath, buffer);
+    } catch (fsErr) {
+      console.warn('Non-fatal: could not persist copy to temp disk, processing from memory buffer:', fsErr);
+      filePath = `memory://${uniqueFileName}`;
+    }
 
     const docTitle = customTitle?.trim() || originalFilename.replace(/\.[^/.]+$/, '');
 
@@ -68,8 +76,8 @@ export async function POST(req: Request) {
     });
 
     try {
-      // 1. Extract text
-      const parsed = await parseDocumentFile(filePath, originalFilename);
+      // 1. Extract text directly from buffer
+      const parsed = await parseDocumentFile(buffer, originalFilename);
 
       if (!parsed.text || parsed.text.trim().length === 0) {
         throw new Error('Extracted text is empty. The document may be scanned, image-only, or encrypted.');
@@ -230,8 +238,11 @@ export async function POST(req: Request) {
         { status: 500 }
       );
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('Upload handler error:', error);
-    return NextResponse.json({ error: 'Server error processing upload' }, { status: 500 });
+    return NextResponse.json({
+      error: error?.message || 'Server error processing upload',
+      details: error?.stack || String(error),
+    }, { status: 500 });
   }
 }

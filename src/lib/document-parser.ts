@@ -5,6 +5,8 @@ import officeParser from 'officeparser';
 // @ts-ignore
 import pdfParse from 'pdf-parse';
 import mammoth from 'mammoth';
+// @ts-ignore
+import yauzl from 'yauzl';
 
 export interface DocumentChunk {
   pageOrSlideNumber: number;
@@ -20,8 +22,50 @@ export interface ParsedDocumentResult {
   chunks: DocumentChunk[];
 }
 
+function parsePptxWithYauzl(buffer: Buffer): Promise<Array<{ slideNum: number; header: string; content: string }>> {
+  return new Promise((resolve) => {
+    yauzl.fromBuffer(buffer, { lazyEntries: true }, (err: any, zipfile: any) => {
+      if (err || !zipfile) return resolve([]);
+      const slides: Array<{ slideNum: number; header: string; content: string }> = [];
+      zipfile.readEntry();
+      zipfile.on('entry', (entry: any) => {
+        if (/^ppt\/slides\/slide\d+\.xml$/.test(entry.fileName)) {
+          const match = entry.fileName.match(/slide(\d+)\.xml/);
+          const slideNum = match ? parseInt(match[1], 10) : 1;
+          zipfile.openReadStream(entry, (openErr: any, readStream: any) => {
+            if (openErr || !readStream) {
+              zipfile.readEntry();
+              return;
+            }
+            const chunks: Buffer[] = [];
+            readStream.on('data', (c: Buffer) => chunks.push(c));
+            readStream.on('end', () => {
+              const xml = Buffer.concat(chunks).toString('utf-8');
+              const textMatches = xml.match(/<a:t[^>]*>([^<]+)<\/a:t>/g) || [];
+              const textParts = textMatches.map((m: string) => m.replace(/<[^>]+>/g, '').trim()).filter(Boolean);
+              if (textParts.length > 0) {
+                const header = textParts[0].slice(0, 90);
+                const content = textParts.join(' ');
+                slides.push({ slideNum, header, content });
+              }
+              zipfile.readEntry();
+            });
+          });
+        } else {
+          zipfile.readEntry();
+        }
+      });
+      zipfile.on('end', () => {
+        slides.sort((a, b) => a.slideNum - b.slideNum);
+        resolve(slides);
+      });
+      zipfile.on('error', () => resolve(slides));
+    });
+  });
+}
+
 export async function parseDocumentFile(
-  filePath: string,
+  input: string | Buffer,
   originalFilename: string
 ): Promise<ParsedDocumentResult> {
   const ext = path.extname(originalFilename).toLowerCase().replace('.', '');
@@ -29,17 +73,18 @@ export async function parseDocumentFile(
   let pageCount = 1;
   const chunks: DocumentChunk[] = [];
 
+  const buffer = Buffer.isBuffer(input) ? input : await fs.readFile(input);
+
   try {
     if (ext === 'pdf') {
-      const dataBuffer = await fs.readFile(filePath);
-      const pdfData = await pdfParse(dataBuffer);
+      const pdfData = await pdfParse(buffer);
       extractedText = pdfData.text || '';
       pageCount = pdfData.numpages || 1;
 
       // Split PDF by form feeds (\f) or double newlines
       const rawPages = extractedText.split('\f');
       if (rawPages.length > 1) {
-        rawPages.forEach((pageText, idx) => {
+        rawPages.forEach((pageText: string, idx: number) => {
           const cleanPage = pageText.trim();
           if (cleanPage.length > 20) {
             const firstLine = cleanPage.split('\n')[0].replace(/[^a-zA-Z0-9\s-]/g, '').slice(0, 80).trim();
@@ -52,8 +97,7 @@ export async function parseDocumentFile(
         });
       }
     } else if (ext === 'docx' || ext === 'doc') {
-      const dataBuffer = await fs.readFile(filePath);
-      const result = await mammoth.extractRawText({ buffer: dataBuffer });
+      const result = await mammoth.extractRawText({ buffer });
       extractedText = result.value || '';
       const words = extractedText.trim().split(/\s+/).length;
       pageCount = Math.max(1, Math.ceil(words / 400));
@@ -71,33 +115,46 @@ export async function parseDocumentFile(
         });
       });
     } else if (ext === 'pptx' || ext === 'ppt') {
-      try {
-        const text = await officeParser.parseOfficeAsync(filePath);
-        extractedText = typeof text === 'string' ? text : JSON.stringify(text);
-      } catch (pptErr) {
-        const buffer = await fs.readFile(filePath);
-        extractedText = buffer.toString('utf-8').replace(/[^\x20-\x7E\n\r\t]/g, ' ');
-      }
-
-      // Deconstruct slides from PPTX text blocks
-      const rawBlocks = extractedText
-        .split(/\n{2,}/)
-        .map((b) => b.trim())
-        .filter((b) => b.length > 15);
-
-      pageCount = Math.max(1, Math.min(60, rawBlocks.length));
-
-      rawBlocks.forEach((block, idx) => {
-        const lines = block.split('\n').map((l) => l.trim()).filter(Boolean);
-        const headerCandidate = lines[0] || `Slide ${idx + 1}`;
-        chunks.push({
-          pageOrSlideNumber: idx + 1,
-          sectionHeader: headerCandidate.slice(0, 90),
-          content: block,
+      // 1. First attempt: Direct slide-by-slide XML extraction via yauzl
+      const slideEntries = await parsePptxWithYauzl(buffer);
+      if (slideEntries.length > 0) {
+        pageCount = slideEntries.length;
+        extractedText = slideEntries.map((s) => `[Slide ${s.slideNum}: ${s.header}]\n${s.content}`).join('\n\n');
+        slideEntries.forEach((s) => {
+          chunks.push({
+            pageOrSlideNumber: s.slideNum,
+            sectionHeader: s.header,
+            content: s.content,
+          });
         });
-      });
+      } else {
+        // 2. Second attempt: officeParser on buffer
+        try {
+          const text = await officeParser.parseOfficeAsync(buffer);
+          extractedText = typeof text === 'string' ? text : JSON.stringify(text);
+        } catch (pptErr) {
+          extractedText = buffer.toString('utf-8').replace(/[^\x20-\x7E\n\r\t]/g, ' ');
+        }
+
+        const rawBlocks = extractedText
+          .split(/\n{2,}/)
+          .map((b) => b.trim())
+          .filter((b) => b.length > 15);
+
+        pageCount = Math.max(1, Math.min(80, rawBlocks.length));
+
+        rawBlocks.forEach((block, idx) => {
+          const lines = block.split('\n').map((l) => l.trim()).filter(Boolean);
+          const headerCandidate = lines[0] || `Slide ${idx + 1}`;
+          chunks.push({
+            pageOrSlideNumber: idx + 1,
+            sectionHeader: headerCandidate.slice(0, 90),
+            content: block,
+          });
+        });
+      }
     } else if (ext === 'txt') {
-      extractedText = await fs.readFile(filePath, 'utf-8');
+      extractedText = buffer.toString('utf-8');
       const words = extractedText.trim().split(/\s+/).length;
       pageCount = Math.max(1, Math.ceil(words / 400));
 
@@ -110,7 +167,7 @@ export async function parseDocumentFile(
         });
       });
     } else {
-      extractedText = await fs.readFile(filePath, 'utf-8');
+      extractedText = buffer.toString('utf-8');
     }
   } catch (error) {
     console.error('Error parsing document:', error);
