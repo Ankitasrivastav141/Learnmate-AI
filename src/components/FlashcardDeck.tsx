@@ -9,41 +9,70 @@ import {
   ChevronRight,
   Shuffle,
   Sparkles,
+  Award,
+  Layers,
+  BrainCircuit,
+  Filter,
 } from 'lucide-react';
 
 export interface FlashcardItem {
   id: string;
   front: string;
   back: string;
-  difficulty: string;
-  topic?: { title: string } | null;
+  difficulty: string; // 'Easy' | 'Medium' | 'Hard'
+  topic?: { title: string } | null | string;
   reviewCount?: number;
   correctCount?: number;
+  documentTitle?: string;
 }
 
 interface FlashcardDeckProps {
-  cards: FlashcardItem[];
+  cards?: FlashcardItem[];
+  flashcards?: FlashcardItem[];
+  onRatingUpdate?: (cardId: string, rating: 'Easy' | 'Medium' | 'Hard') => void;
 }
 
-export function FlashcardDeck({ cards: initialCards }: FlashcardDeckProps) {
-  const [cards, setCards] = useState<FlashcardItem[]>(initialCards);
+export function FlashcardDeck({ cards: initialCards, flashcards, onRatingUpdate }: FlashcardDeckProps) {
+  const effectiveCards = initialCards || flashcards || [];
+  const [cards, setCards] = useState<FlashcardItem[]>(effectiveCards);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
-  const [masteredCount, setMasteredCount] = useState(0);
+  const [difficultyFilter, setDifficultyFilter] = useState<'ALL' | 'Hard' | 'Medium' | 'Easy'>('ALL');
+  const [sessionRatings, setSessionRatings] = useState<Record<string, 'Easy' | 'Medium' | 'Hard'>>({});
+
+  const activeCards = cards.filter((c) =>
+    difficultyFilter === 'ALL' ? true : (c.difficulty || 'Medium') === difficultyFilter
+  );
 
   if (!cards || cards.length === 0) {
     return (
-      <div className="bg-white border border-[#E5DCD0] rounded-2xl p-12 text-center shadow-sm">
-        <Sparkles className="w-8 h-8 text-[#B58B83] mx-auto mb-3" />
-        <h4 className="text-base font-semibold text-[#252222]">No Flashcards Available</h4>
-        <p className="text-xs text-[#6E5D59] mt-1 max-w-sm mx-auto">
-          Upload a study document to automatically generate topic-wise flashcards.
+      <div className="bg-white border border-slate-200 rounded-2xl p-12 text-center shadow-sm">
+        <Sparkles className="w-8 h-8 text-blue-600 mx-auto mb-3" />
+        <h4 className="text-base font-bold text-slate-800">No Flashcards Available</h4>
+        <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+          Upload a lecture presentation or document to automatically extract terminology and concept flashcards.
         </p>
       </div>
     );
   }
 
-  const currentCard = cards[currentIndex];
+  if (activeCards.length === 0) {
+    return (
+      <div className="bg-white border border-slate-200 rounded-2xl p-10 text-center shadow-sm space-y-3">
+        <Layers className="w-8 h-8 text-slate-400 mx-auto" />
+        <h4 className="text-sm font-bold text-slate-800">No {difficultyFilter} cards found</h4>
+        <button
+          onClick={() => setDifficultyFilter('ALL')}
+          className="text-xs font-semibold text-blue-600 hover:underline"
+        >
+          View all cards ({cards.length})
+        </button>
+      </div>
+    );
+  }
+
+  const safeIndex = Math.min(currentIndex, activeCards.length - 1);
+  const currentCard = activeCards[safeIndex];
 
   const handleFlip = () => {
     setIsFlipped(!isFlipped);
@@ -51,12 +80,12 @@ export function FlashcardDeck({ cards: initialCards }: FlashcardDeckProps) {
 
   const handleNext = () => {
     setIsFlipped(false);
-    setCurrentIndex((prev) => (prev + 1) % cards.length);
+    setCurrentIndex((prev) => (prev + 1) % activeCards.length);
   };
 
   const handlePrev = () => {
     setIsFlipped(false);
-    setCurrentIndex((prev) => (prev - 1 + cards.length) % cards.length);
+    setCurrentIndex((prev) => (prev - 1 + activeCards.length) % activeCards.length);
   };
 
   const handleShuffle = () => {
@@ -66,16 +95,26 @@ export function FlashcardDeck({ cards: initialCards }: FlashcardDeckProps) {
     setCurrentIndex(0);
   };
 
-  const handleReview = async (remembered: boolean) => {
-    if (remembered) {
-      setMasteredCount((prev) => prev + 1);
+  const handleRateDifficulty = async (rating: 'Easy' | 'Medium' | 'Hard') => {
+    setSessionRatings((prev) => ({ ...prev, [currentCard.id]: rating }));
+
+    // Update in local state
+    setCards((prev) =>
+      prev.map((c) => (c.id === currentCard.id ? { ...c, difficulty: rating } : c))
+    );
+
+    if (onRatingUpdate) {
+      onRatingUpdate(currentCard.id, rating);
     }
 
     try {
       await fetch(`/api/flashcards/${currentCard.id}/review`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ remembered }),
+        body: JSON.stringify({
+          remembered: rating !== 'Hard',
+          difficulty: rating,
+        }),
       });
     } catch (err) {
       console.error('Failed to log flashcard review:', err);
@@ -84,142 +123,186 @@ export function FlashcardDeck({ cards: initialCards }: FlashcardDeckProps) {
     handleNext();
   };
 
-  const getDifficultyBadge = (difficulty: string) => {
-    switch (difficulty?.toLowerCase()) {
-      case 'easy':
-        return 'bg-emerald-50 text-emerald-700 border-emerald-200';
-      case 'hard':
-        return 'bg-[#652D3D]/10 text-[#652D3D] border-[#652D3D]/20';
-      default:
-        return 'bg-[#FAF7F2] text-[#6E5D59] border-[#E5DCD0]';
-    }
-  };
+  const masteredCount = cards.filter(
+    (c) => (sessionRatings[c.id] || c.difficulty) === 'Easy'
+  ).length;
+  const reviewNeededCount = cards.filter(
+    (c) => (sessionRatings[c.id] || c.difficulty) === 'Hard'
+  ).length;
+
+  const currentTopic =
+    typeof currentCard.topic === 'string'
+      ? currentCard.topic
+      : currentCard.topic?.title || 'Key Concept';
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
-      {/* Top Deck Stats & Controls */}
-      <div className="flex items-center justify-between text-xs text-[#6E5D59]">
+    <div className="max-w-2xl mx-auto space-y-5 animate-in fade-in duration-200">
+      {/* 1. Deck Stats & Filter Strip */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <span className="font-semibold text-[#252222]">
-            Card {currentIndex + 1} of {cards.length}
-          </span>
-          <span className="px-2 py-0.5 rounded-full bg-[#FAF7F2] border border-[#E5DCD0] text-[#252222] font-mono">
-            {masteredCount} Mastered
-          </span>
+          <div className="text-xs">
+            <span className="text-slate-500 font-medium">Card: </span>
+            <span className="font-bold text-slate-900">
+              {safeIndex + 1} of {activeCards.length}
+            </span>
+          </div>
+
+          <div className="h-4 w-px bg-slate-200" />
+
+          <div className="flex items-center gap-2 text-xs">
+            <span className="inline-flex items-center gap-1 text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full font-semibold">
+              <CheckCircle2 className="w-3 h-3" /> {masteredCount} Mastered
+            </span>
+            <span className="inline-flex items-center gap-1 text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full font-semibold">
+              <RotateCcw className="w-3 h-3" /> {reviewNeededCount} Needs Review
+            </span>
+          </div>
         </div>
-        <button
-          onClick={handleShuffle}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-[#FAF7F2] text-[#252222] border border-[#DED4C7] transition-colors cursor-pointer shadow-sm"
-        >
-          <Shuffle className="w-3.5 h-3.5 text-[#652D3D]" />
-          Shuffle
-        </button>
+
+        <div className="flex items-center gap-2">
+          {/* Difficulty Filter */}
+          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl text-xs">
+            {(['ALL', 'Hard', 'Medium', 'Easy'] as const).map((filter) => (
+              <button
+                key={filter}
+                onClick={() => {
+                  setDifficultyFilter(filter);
+                  setCurrentIndex(0);
+                  setIsFlipped(false);
+                }}
+                className={`px-2.5 py-1 rounded-lg font-semibold transition-colors cursor-pointer ${
+                  difficultyFilter === filter
+                    ? 'bg-white text-slate-900 shadow-sm'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                {filter === 'ALL' ? 'All' : filter}
+              </button>
+            ))}
+          </div>
+
+          <button
+            onClick={handleShuffle}
+            className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+            title="Shuffle deck"
+          >
+            <Shuffle className="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
-      {/* 3D Flip Card */}
+      {/* 2. Interactive 3D Flashcard Flip Container */}
       <div
         onClick={handleFlip}
-        className="w-full h-80 cursor-pointer select-none perspective-1000 group"
+        className="w-full min-h-[300px] cursor-pointer perspective-1000 group"
       >
         <div
-          className={`relative w-full h-full duration-500 transform-style-3d transition-transform ${
-            isFlipped ? 'rotate-y-180' : ''
-          }`}
+          className={`relative w-full min-h-[300px] transition-transform duration-500 transform-style-3d rounded-2xl border ${
+            isFlipped
+              ? 'bg-blue-50/40 border-blue-200 shadow-md'
+              : 'bg-white border-slate-200 shadow-sm hover:shadow-md'
+          } p-8 flex flex-col justify-between`}
         >
-          {/* FRONT */}
-          <div className="absolute inset-0 backface-hidden bg-white border-2 border-[#E5DCD0] rounded-2xl p-8 flex flex-col justify-between shadow-sm group-hover:border-[#B58B83] transition-colors">
-            <div className="flex items-center justify-between">
-              <span className="text-xs uppercase font-semibold tracking-wider text-[#652D3D] flex items-center gap-1.5">
-                <Sparkles className="w-3 h-3 text-[#B58B83]" />
-                Prompt / Question
-              </span>
+          {/* Card Header */}
+          <div className="flex items-center justify-between text-xs pb-3 border-b border-slate-100">
+            <span className="font-bold text-blue-600 uppercase tracking-wider text-[11px]">
+              {currentTopic}
+            </span>
+
+            <div className="flex items-center gap-2">
               <span
-                className={`text-[11px] font-medium px-2 py-0.5 rounded-md border ${getDifficultyBadge(
-                  currentCard.difficulty
-                )}`}
+                className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                  (currentCard.difficulty || 'Medium') === 'Easy'
+                    ? 'bg-emerald-100 text-emerald-800'
+                    : (currentCard.difficulty || 'Medium') === 'Hard'
+                    ? 'bg-red-100 text-red-800'
+                    : 'bg-amber-100 text-amber-800'
+                }`}
               >
-                {currentCard.difficulty}
+                {currentCard.difficulty || 'Medium'}
               </span>
-            </div>
-
-            <div className="my-auto text-center px-4">
-              <h3 className="text-lg md:text-xl font-bold text-[#252222] leading-relaxed">
-                {currentCard.front}
-              </h3>
-            </div>
-
-            <div className="flex items-center justify-between text-xs text-[#6E5D59] pt-4 border-t border-[#E5DCD0]">
-              <span>{currentCard.topic?.title || 'General Concept'}</span>
-              <span className="flex items-center gap-1 text-[#652D3D] font-medium">
-                <RotateCcw className="w-3 h-3" /> Click card to flip
+              <span className="text-[11px] text-slate-400 font-medium">
+                {isFlipped ? 'Back (Answer)' : 'Front (Question)'}
               </span>
             </div>
           </div>
 
-          {/* BACK */}
-          <div className="absolute inset-0 backface-hidden rotate-y-180 bg-gradient-to-br from-[#FFFDF9] to-[#FAF7F2] border-2 border-[#652D3D]/50 rounded-2xl p-8 flex flex-col justify-between shadow-sm">
-            <div className="flex items-center justify-between">
-              <span className="text-xs uppercase font-semibold tracking-wider text-[#652D3D] flex items-center gap-1.5">
-                <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                Explanation / Answer
-              </span>
-              <span className="text-[11px] text-[#6E5D59]">Grounded in material</span>
-            </div>
+          {/* Card Body */}
+          <div className="py-8 text-center flex-1 flex flex-col items-center justify-center">
+            {isFlipped ? (
+              <div className="space-y-2 animate-in fade-in duration-200 max-w-lg">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">
+                  Concept & Explanation
+                </span>
+                <p className="text-base font-medium text-slate-800 leading-relaxed">
+                  {currentCard.back}
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2 max-w-lg">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">
+                  Term / Question
+                </span>
+                <p className="text-lg md:text-xl font-bold text-slate-900 leading-relaxed">
+                  {currentCard.front}
+                </p>
+              </div>
+            )}
+          </div>
 
-            <div className="my-auto text-center px-4 overflow-y-auto max-h-44">
-              <p className="text-base md:text-lg font-medium text-[#252222] leading-relaxed">
-                {currentCard.back}
-              </p>
-            </div>
-
-            <div className="flex items-center justify-between text-xs text-[#6E5D59] pt-4 border-t border-[#E5DCD0]">
-              <span>Tap again to flip back</span>
-              <span className="text-[#652D3D] font-semibold">Verify your memory</span>
-            </div>
+          {/* Card Footer prompt */}
+          <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400">
+            <span>Click card or press space to flip</span>
+            <span className="text-blue-600 font-semibold group-hover:underline">
+              {isFlipped ? 'Show Question' : 'Show Answer'}
+            </span>
           </div>
         </div>
       </div>
 
-      {/* Spaced-Repetition Feedback Buttons */}
-      <div className="grid grid-cols-2 gap-4">
-        <button
-          onClick={() => handleReview(false)}
-          className="flex items-center justify-center gap-2 py-3 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200 transition-all font-semibold text-sm cursor-pointer shadow-sm"
-        >
-          <XCircle className="w-4 h-4 text-rose-600" />
-          Need Practice
-        </button>
+      {/* 3. Rating & Spaced Repetition Feedback Controls */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div className="flex items-center gap-1.5 w-full sm:w-auto">
+          <button
+            onClick={handlePrev}
+            className="p-2 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
+            title="Previous card"
+          >
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+          <button
+            onClick={handleNext}
+            className="p-2 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
+            title="Next card"
+          >
+            <ChevronRight className="w-5 h-5" />
+          </button>
+        </div>
 
-        <button
-          onClick={() => handleReview(true)}
-          className="flex items-center justify-center gap-2 py-3 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 transition-all font-semibold text-sm cursor-pointer shadow-sm"
-        >
-          <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-          Mastered It
-        </button>
-      </div>
-
-      {/* Navigation Arrow Controls */}
-      <div className="flex items-center justify-center gap-6 pt-2">
-        <button
-          onClick={handlePrev}
-          className="p-2.5 rounded-full bg-white hover:bg-[#FAF7F2] text-[#252222] border border-[#DED4C7] transition-colors cursor-pointer shadow-sm"
-          aria-label="Previous card"
-        >
-          <ChevronLeft className="w-5 h-5" />
-        </button>
-
-        <span className="text-xs text-[#6E5D59] font-medium">
-          Use buttons or click card to flip
-        </span>
-
-        <button
-          onClick={handleNext}
-          className="p-2.5 rounded-full bg-white hover:bg-[#FAF7F2] text-[#252222] border border-[#DED4C7] transition-colors cursor-pointer shadow-sm"
-          aria-label="Next card"
-        >
-          <ChevronRight className="w-5 h-5" />
-        </button>
+        {/* Rating Buttons */}
+        <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+          <span className="text-xs text-slate-500 font-medium mr-1 hidden sm:inline">
+            Rate Mastery:
+          </span>
+          <button
+            onClick={() => handleRateDifficulty('Hard')}
+            className="flex-1 sm:flex-none px-3.5 py-1.5 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 text-xs font-semibold border border-red-200 transition-colors cursor-pointer"
+          >
+            Hard (Review Soon)
+          </button>
+          <button
+            onClick={() => handleRateDifficulty('Medium')}
+            className="flex-1 sm:flex-none px-3.5 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-semibold border border-amber-200 transition-colors cursor-pointer"
+          >
+            Medium
+          </button>
+          <button
+            onClick={() => handleRateDifficulty('Easy')}
+            className="flex-1 sm:flex-none px-3.5 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-semibold border border-emerald-200 transition-colors cursor-pointer"
+          >
+            Easy (Mastered)
+          </button>
+        </div>
       </div>
     </div>
   );

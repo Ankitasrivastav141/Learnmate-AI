@@ -46,18 +46,18 @@ export function Sidebar() {
   ];
 
   return (
-    <aside className="w-64 bg-[#F8F3ED] border-r border-[#E5DCD0] flex flex-col h-screen sticky top-0 z-30 select-none">
+    <aside className="w-64 bg-white border-r border-[#E2E8F0] flex flex-col h-screen sticky top-0 z-30 select-none">
       {/* Brand Header */}
-      <div className="p-5 border-b border-[#E5DCD0] flex items-center justify-between">
+      <div className="p-5 border-b border-[#E2E8F0] flex items-center justify-between">
         <Link href="/" className="flex items-center gap-3 group">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-[#652D3D] to-[#B58B83] flex items-center justify-center shadow-md shadow-[#652D3D]/20 group-hover:scale-105 transition-transform">
-            <Sparkles className="w-5 h-5 text-[#F3EDE3]" />
+          <div className="w-10 h-10 rounded-xl bg-[#172554] flex items-center justify-center shadow-md shadow-[#172554]/20 group-hover:scale-105 transition-transform">
+            <Sparkles className="w-5 h-5 text-white" />
           </div>
           <div>
-            <span className="font-bold text-lg text-[#252222] tracking-tight flex items-center gap-1.5">
-              LearnMate <span className="text-[#F3EDE3] text-xs px-1.5 py-0.5 rounded bg-[#652D3D] font-mono">AI</span>
+            <span className="font-bold text-lg text-[#0F172A] tracking-tight flex items-center gap-1.5">
+              LearnMate <span className="text-white text-xs px-1.5 py-0.5 rounded bg-[#2563EB] font-mono">AI</span>
             </span>
-            <p className="text-[11px] text-[#6E5D59] font-medium">Academic LMS</p>
+            <p className="text-[11px] text-[#64748B] font-medium">Personal LMS</p>
           </div>
         </Link>
       </div>
@@ -65,7 +65,7 @@ export function Sidebar() {
       {/* Main Navigation */}
       <div className="flex-1 overflow-y-auto px-3 py-4 space-y-6">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-[#6E5D59] px-3 mb-2">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-[#64748B] px-3 mb-2">
             Main Menu
           </p>
           <nav className="space-y-1">
@@ -82,17 +82,17 @@ export function Sidebar() {
                   href={item.href}
                   className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
                     isActive
-                      ? 'bg-[#652D3D] text-[#F3EDE3] font-semibold shadow-sm'
-                      : 'text-[#4F4240] hover:text-[#252222] hover:bg-[#EFE7DD]'
+                      ? 'bg-[#172554] text-white font-semibold shadow-sm'
+                      : 'text-[#475569] hover:text-[#0F172A] hover:bg-[#F1F5F9]'
                   }`}
                 >
-                  <Icon className={`w-4 h-4 ${isActive ? 'text-[#F3EDE3]' : 'text-[#6E5D59]'}`} />
+                  <Icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-[#64748B]'}`} />
                   <span className="flex-1">{item.label}</span>
                   {item.highlight && (
                     <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded shadow-sm ${
-                      isActive ? 'bg-[#F3EDE3] text-[#652D3D]' : 'bg-[#652D3D] text-[#F3EDE3]'
+                      isActive ? 'bg-[#2563EB] text-white' : 'bg-[#0F766E] text-white'
                     }`}>
-                      NEW
+                      AI
                     </span>
                   )}
                 </Link>
@@ -104,12 +104,12 @@ export function Sidebar() {
         {/* Subjects Sub-list */}
         <div>
           <div className="flex items-center justify-between px-3 mb-2">
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-[#6E5D59]">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-[#64748B]">
               My Subjects
             </p>
             <Link
               href="/subjects"
-              className="text-xs text-[#6E5D59] hover:text-[#252222] font-medium flex items-center gap-0.5"
+              className="text-xs text-[#64748B] hover:text-[#0F172A] font-medium flex items-center gap-0.5"
             >
               <Layers className="w-3 h-3" />
             </Link>
@@ -117,7 +117,7 @@ export function Sidebar() {
 
           <div className="space-y-1">
             {subjects.length === 0 ? (
-              <p className="text-xs text-[#6E5D59]/60 px-3 italic">No subjects added yet</p>
+              <p className="text-xs text-[#64748B]/60 px-3 italic">No subjects added yet</p>
             ) : (
               subjects.map((sub) => {
                 const isSubjectActive = pathname === `/subjects/${sub.id}`;
@@ -127,13 +127,13 @@ export function Sidebar() {
                     href={`/subjects/${sub.id}`}
                     className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
                       isSubjectActive
-                        ? 'bg-[#652D3D]/10 text-[#652D3D] border border-[#652D3D]/30 font-semibold'
-                        : 'text-[#4F4240] hover:text-[#252222] hover:bg-[#EFE7DD]'
+                        ? 'bg-[#2563EB]/10 text-[#2563EB] border border-[#2563EB]/30 font-semibold'
+                        : 'text-[#475569] hover:text-[#0F172A] hover:bg-[#F1F5F9]'
                     }`}
                   >
                     <span
                       className="w-2.5 h-2.5 rounded-full shrink-0"
-                      style={{ backgroundColor: sub.color || '#652D3D' }}
+                      style={{ backgroundColor: sub.color || '#2563EB' }}
                     />
                     <span className="truncate">{sub.name}</span>
                   </Link>
@@ -145,13 +145,13 @@ export function Sidebar() {
       </div>
 
       {/* User / Engine Status Card */}
-      <div className="p-3 border-t border-[#E5DCD0]">
-        <div className="bg-[#EFE7DD] border border-[#DED4C7] rounded-xl p-3 flex items-center justify-between">
+      <div className="p-3 border-t border-[#E2E8F0]">
+        <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-3 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="w-2 h-2 rounded-full bg-[#652D3D] animate-pulse" />
+            <div className="w-2 h-2 rounded-full bg-[#15803D] animate-pulse" />
             <div>
-              <p className="text-xs font-semibold text-[#252222]">Gemini AI Connected</p>
-              <p className="text-[10px] text-[#6E5D59]">PPTX • PDF • DOCX • TXT</p>
+              <p className="text-xs font-semibold text-[#0F172A]">Gemini AI Active</p>
+              <p className="text-[10px] text-[#64748B]">PPTX • PDF • DOCX • TXT</p>
             </div>
           </div>
         </div>

@@ -15,6 +15,11 @@ import {
   Layers,
   Plus,
   Upload,
+  BrainCircuit,
+  CheckCircle2,
+  Calendar,
+  BarChart3,
+  Flame,
 } from 'lucide-react';
 import { MetricsCard } from '@/components/MetricsCard';
 import { DocumentUploadModal } from '@/components/DocumentUploadModal';
@@ -28,7 +33,34 @@ interface AnalyticsData {
     totalFlashcards: number;
     completedQuizzesCount: number;
     averageScore: number;
+    totalStudySessions: number;
+    topicsCompleted: number;
   };
+  continueLearning: Array<{
+    id: string;
+    name: string;
+    color: string;
+    description: string | null;
+    documentsCount: number;
+    quizzesCompleted: number;
+    averageScore: number;
+    latestDocument: string | null;
+    lastActivity: string | null;
+  }>;
+  recommendations: Array<{
+    topicId: string;
+    topicTitle: string;
+    subjectId: string;
+    documentId: string;
+    documentTitle: string;
+    accuracy: number;
+    reason: string;
+  }>;
+  weeklyProgress: Array<{
+    day: string;
+    minutes: number;
+    quizzes: number;
+  }>;
   scoreTrend: Array<{ date: string; score: number; title: string }>;
   subjectPerformance: Array<{
     id: string;
@@ -38,19 +70,32 @@ interface AnalyticsData {
     quizzesCompleted: number;
     averageScore: number;
   }>;
-  weakTopics: Array<{
-    topicTitle: string;
-    documentTitle: string;
-    documentId: string;
-    accuracy: number;
-    totalAnswers: number;
-  }>;
   recentActivities: Array<{
     id: string;
     type: string;
     description: string;
     createdAt: string;
     subject?: { name: string; color: string } | null;
+  }>;
+  recentDocuments: Array<{
+    id: string;
+    title: string;
+    subjectName?: string;
+    subjectColor?: string;
+    createdAt: string;
+  }>;
+  recentNotes: Array<{
+    id: string;
+    title: string;
+    documentTitle?: string;
+    createdAt: string;
+  }>;
+  recentQuizzes: Array<{
+    id: string;
+    title: string;
+    scorePercentage: number;
+    subjectName?: string;
+    completedAt: string;
   }>;
 }
 
@@ -60,14 +105,19 @@ export default function DashboardPage() {
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [isCreateSubjectOpen, setIsCreateSubjectOpen] = useState(false);
 
-  useEffect(() => {
-    fetch('/api/analytics')
+  const fetchDashboardData = () => {
+    setIsLoading(true);
+    fetch('/api/analytics', { cache: 'no-store' })
       .then((res) => res.json())
       .then((resData) => {
         setData(resData);
       })
       .catch((err) => console.error('Failed to load dashboard data:', err))
       .finally(() => setIsLoading(false));
+  };
+
+  useEffect(() => {
+    fetchDashboardData();
   }, []);
 
   const summary = data?.summary || {
@@ -76,248 +126,460 @@ export default function DashboardPage() {
     totalFlashcards: 0,
     completedQuizzesCount: 0,
     averageScore: 0,
+    totalStudySessions: 0,
+    topicsCompleted: 0,
   };
+
+  const maxWeeklyMinutes = Math.max(
+    ...(data?.weeklyProgress?.map((w) => w.minutes) || [30]),
+    30
+  );
 
   return (
     <div className="space-y-8 animate-in fade-in duration-200">
-      {/* Hero Welcome Banner */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#F3EDE3] via-[#FAF7F2] to-white border border-[#E5DCD0] p-6 md:p-8 shadow-sm">
+      {/* 1. Header & Welcome Section */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-blue-900 via-navy to-slate-900 p-6 md:p-8 text-white shadow-md">
         <div className="relative z-10 max-w-2xl">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#652D3D]/10 border border-[#652D3D]/20 text-[#652D3D] text-xs font-semibold mb-3">
-            <Sparkles className="w-3.5 h-3.5 text-[#652D3D]" />
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/20 border border-blue-400/30 text-blue-200 text-xs font-semibold mb-3">
+            <Sparkles className="w-3.5 h-3.5 text-blue-400" />
             AI-Powered Academic Intelligence
           </div>
-          <h1 className="text-2xl md:text-3xl font-bold text-[#252222] tracking-tight">
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
             Welcome to LearnMate AI
           </h1>
-          <p className="text-sm text-[#4F4240] mt-2 leading-relaxed">
-            Upload your lecture presentations, academic PDFs, and notes. LearnMate AI automatically extracts concepts, generates comprehensive study notes, interactive flashcards, and grounded 10-question quizzes.
+          <p className="text-sm text-slate-300 mt-2 leading-relaxed">
+            Your personal learning workspace. Organize subjects, convert lecture presentations into comprehensive study packs, master key concepts, and practise grounded quizzes with mistake analysis.
           </p>
 
+          {/* Quick Actions Bar */}
           <div className="flex flex-wrap items-center gap-3 mt-6">
             <button
               onClick={() => setIsUploadOpen(true)}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#652D3D] hover:bg-[#522431] text-[#F3EDE3] font-semibold text-xs shadow-md shadow-[#652D3D]/20 transition-all cursor-pointer"
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs shadow-md shadow-blue-900/30 transition-all cursor-pointer"
             >
               <Upload className="w-4 h-4" />
-              Upload Study Document
+              Upload Study Material
+            </button>
+            <button
+              onClick={() => setIsCreateSubjectOpen(true)}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs border border-slate-700 transition-all cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              Create Subject
             </button>
             <Link
               href="/quizzes"
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white hover:bg-[#FAF7F2] text-[#252222] font-semibold text-xs border border-[#DED4C7] shadow-sm transition-colors"
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-semibold text-xs transition-all"
             >
-              <GraduationCap className="w-4 h-4 text-[#652D3D]" />
+              <GraduationCap className="w-4 h-4" />
               Start Practice Quiz
             </Link>
           </div>
         </div>
 
-        <div className="absolute right-0 top-0 bottom-0 w-1/3 bg-gradient-to-l from-[#652D3D]/5 to-transparent pointer-events-none" />
+        {/* Decorative background glow */}
+        <div className="absolute -top-12 -right-12 w-80 h-80 rounded-full bg-blue-500/10 blur-3xl pointer-events-none" />
       </div>
 
-      {/* Core Metrics Snapshot */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+      {/* 2. Overview Statistics (6 metrics) */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
         <MetricsCard
           title="Total Subjects"
           value={summary.totalSubjects}
-          subtext="Active academic disciplines"
-          icon={BookOpen}
-          color="#652D3D"
+          subtitle="Enrolled courses"
+          icon={<BookOpen className="w-5 h-5" />}
+          color="#2563EB"
         />
         <MetricsCard
-          title="Uploaded Documents"
+          title="Study Documents"
           value={summary.totalDocuments}
-          subtext="PPTX, PDF, DOCX ingested"
-          icon={FileText}
-          color="#B58B83"
+          subtitle="Processed slides & docs"
+          icon={<FileText className="w-5 h-5" />}
+          color="#0F766E"
         />
         <MetricsCard
-          title="Quizzes Completed"
+          title="Quizzes Done"
           value={summary.completedQuizzesCount}
-          subtext="10-question practice sets"
-          icon={GraduationCap}
-          color="#10b981"
+          subtitle="Completed sessions"
+          icon={<GraduationCap className="w-5 h-5" />}
+          color="#4F46E5"
         />
         <MetricsCard
-          title="Average Quiz Score"
-          value={`${summary.averageScore}%`}
-          subtext={summary.completedQuizzesCount > 0 ? "Overall mastery level" : "Take a quiz to see score"}
-          icon={Award}
-          color="#d97706"
+          title="Average Score"
+          value={summary.averageScore ? `${summary.averageScore}%` : 'N/A'}
+          subtitle={summary.averageScore >= 75 ? 'Strong standing' : 'Needs practice'}
+          icon={<Award className="w-5 h-5" />}
+          color={summary.averageScore >= 75 ? '#15803D' : '#D97706'}
+        />
+        <MetricsCard
+          title="Study Sessions"
+          value={summary.totalStudySessions}
+          subtitle="Recorded learning"
+          icon={<Clock className="w-5 h-5" />}
+          color="#0284C7"
+        />
+        <MetricsCard
+          title="Topics Mastered"
+          value={summary.topicsCompleted}
+          subtitle="Document units"
+          icon={<Layers className="w-5 h-5" />}
+          color="#7C3AED"
         />
       </div>
 
-      {/* Weak Topics Diagnostic Alert */}
-      {data?.weakTopics && data.weakTopics.length > 0 && (
-        <div className="bg-[#FFF9F6] border border-[#F3D7CC] rounded-2xl p-5 shadow-sm">
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-[#652D3D]/10 border border-[#652D3D]/20 flex items-center justify-center text-[#652D3D] shrink-0">
-                <AlertTriangle className="w-5 h-5" />
+      {/* 3. Continue Learning Section */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <Flame className="w-4 h-4 text-amber-500" />
+            <h2 className="text-base font-bold text-slate-900">Continue Learning</h2>
+          </div>
+          <Link
+            href="/subjects"
+            className="text-xs font-semibold text-blue-600 hover:text-blue-800 flex items-center gap-1"
+          >
+            View all subjects <ArrowRight className="w-3.5 h-3.5" />
+          </Link>
+        </div>
+
+        {data?.continueLearning && data.continueLearning.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {data.continueLearning.map((sub) => (
+              <div
+                key={sub.id}
+                className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm hover:shadow-md transition-all flex flex-col justify-between"
+              >
+                <div>
+                  <div className="flex items-center gap-2.5 mb-2">
+                    <div
+                      className="w-7 h-7 rounded-lg flex items-center justify-center text-white text-xs font-bold shrink-0"
+                      style={{ backgroundColor: sub.color || '#2563EB' }}
+                    >
+                      {sub.name.charAt(0)}
+                    </div>
+                    <div className="min-w-0">
+                      <h3 className="font-semibold text-sm text-slate-900 truncate">
+                        {sub.name}
+                      </h3>
+                      <p className="text-[11px] text-slate-500 truncate">
+                        {sub.latestDocument ? `Latest: ${sub.latestDocument}` : 'No materials yet'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 text-xs text-slate-600 my-3 py-2 border-y border-slate-100">
+                    <span>
+                      <strong className="text-slate-900 font-semibold">{sub.documentsCount}</strong> docs
+                    </span>
+                    <span>•</span>
+                    <span>
+                      <strong className="text-slate-900 font-semibold">{sub.quizzesCompleted}</strong> quizzes
+                    </span>
+                    {sub.averageScore > 0 && (
+                      <>
+                        <span>•</span>
+                        <span className="text-emerald-700 font-semibold">{sub.averageScore}% avg</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 pt-1">
+                  <Link
+                    href={`/subjects/${sub.id}`}
+                    className="flex-1 text-center py-2 bg-slate-50 hover:bg-blue-50 text-blue-700 hover:text-blue-800 text-xs font-semibold rounded-lg border border-slate-200 hover:border-blue-200 transition-colors"
+                  >
+                    Open Workspace
+                  </Link>
+                  <Link
+                    href={`/quizzes?subjectId=${sub.id}`}
+                    className="p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                    title="Take Subject Quiz"
+                  >
+                    <GraduationCap className="w-4 h-4" />
+                  </Link>
+                </div>
               </div>
+            ))}
+          </div>
+        ) : (
+          <div className="bg-white border border-dashed border-slate-300 rounded-xl p-8 text-center">
+            <BookOpen className="w-8 h-8 text-slate-400 mx-auto mb-2" />
+            <h3 className="text-sm font-semibold text-slate-800">No active subjects yet</h3>
+            <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+              Create your first subject or upload a lecture document to kick off your personalized study workspace.
+            </p>
+            <button
+              onClick={() => setIsCreateSubjectOpen(true)}
+              className="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold inline-flex items-center gap-1.5"
+            >
+              <Plus className="w-3.5 h-3.5" /> Create Subject
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* 4. Recommendations & Weekly Progress Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* "What Should I Study Next?" */}
+        <div className="lg:col-span-2 bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+            <div className="flex items-center gap-2">
+              <BrainCircuit className="w-4 h-4 text-teal-600" />
               <div>
-                <h3 className="font-semibold text-sm text-[#252222]">
-                  Focus Required: Weak Topics Detected
-                </h3>
-                <p className="text-xs text-[#6E5D59] mt-0.5">
-                  Quiz analytics show topics with under 70% accuracy. Review these study notes:
+                <h3 className="text-sm font-bold text-slate-900">What Should I Study Next?</h3>
+                <p className="text-xs text-slate-500">
+                  Targeted recommendations based on quiz mistakes and topic weaknesses
                 </p>
               </div>
             </div>
-            <Link
-              href="/analytics"
-              className="text-xs text-[#652D3D] hover:text-[#522431] font-semibold flex items-center gap-1 shrink-0"
-            >
-              Full Diagnostics <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
+            <span className="text-[11px] font-semibold px-2 py-0.5 bg-teal-50 text-teal-700 border border-teal-200 rounded-md">
+              AI Diagnostic
+            </span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4">
-            {data.weakTopics.slice(0, 3).map((topic, idx) => (
-              <Link
-                key={idx}
-                href={`/documents/${topic.documentId}`}
-                className="p-3 rounded-xl bg-white border border-[#E7DFD5] hover:border-[#B58B83] shadow-sm transition-colors flex items-center justify-between"
-              >
-                <div>
-                  <p className="text-xs font-semibold text-[#252222] truncate">{topic.topicTitle}</p>
-                  <p className="text-[11px] text-[#6E5D59] truncate">{topic.documentTitle}</p>
-                </div>
-                <span className="text-xs font-mono font-bold text-rose-600 ml-2">
-                  {topic.accuracy}%
-                </span>
-              </Link>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Subjects & Performance Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left: Active Subjects Grid */}
-        <div className="lg:col-span-2 space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Layers className="w-4 h-4 text-[#652D3D]" />
-              <h2 className="text-base font-semibold text-[#252222]">My Subjects</h2>
-            </div>
-            <Link
-              href="/subjects"
-              className="text-xs text-[#652D3D] hover:text-[#522431] font-medium flex items-center gap-1"
-            >
-              View all <ArrowRight className="w-3 h-3" />
-            </Link>
-          </div>
-
-          {data?.subjectPerformance && data.subjectPerformance.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {data.subjectPerformance.map((sub) => (
-                <Link
-                  key={sub.id}
-                  href={`/subjects/${sub.id}`}
-                  className="bg-white border border-[#E7DFD5] rounded-xl p-5 hover:border-[#B58B83] hover:shadow-sm transition-all group flex flex-col justify-between"
+          <div className="mt-4 space-y-3">
+            {data?.recommendations && data.recommendations.length > 0 ? (
+              data.recommendations.map((rec, idx) => (
+                <div
+                  key={idx}
+                  className="flex items-start justify-between gap-3 p-3.5 rounded-xl bg-slate-50 border border-slate-200 hover:border-blue-300 transition-colors"
                 >
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2.5">
-                        <span
-                          className="w-3 h-3 rounded-full shrink-0"
-                          style={{ backgroundColor: sub.color || '#652D3D' }}
-                        />
-                        <h3 className="font-semibold text-sm text-[#252222] group-hover:text-[#652D3D] transition-colors">
-                          {sub.name}
-                        </h3>
-                      </div>
-                      <span className="text-xs font-mono font-semibold px-2 py-0.5 rounded bg-[#FAF7F2] text-[#252222] border border-[#E5DCD0]">
-                        {sub.averageScore > 0 ? `${sub.averageScore}% avg` : 'No tests'}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-slate-900 truncate">
+                        {rec.topicTitle}
                       </span>
+                      {rec.accuracy > 0 && (
+                        <span
+                          className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                            rec.accuracy < 60
+                              ? 'bg-red-100 text-red-700'
+                              : 'bg-amber-100 text-amber-700'
+                          }`}
+                        >
+                          {rec.accuracy}% Accuracy
+                        </span>
+                      )}
                     </div>
+                    <p className="text-xs text-slate-600 mt-1">{rec.reason}</p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      Source Document: {rec.documentTitle}
+                    </p>
                   </div>
 
-                  <div className="flex items-center justify-between pt-4 mt-4 border-t border-[#EFE7DD] text-xs text-[#6E5D59]">
-                    <span>{sub.documentsCount} Documents</span>
-                    <span>{sub.quizzesCompleted} Quizzes</span>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {rec.documentId && (
+                      <Link
+                        href={`/documents/${rec.documentId}`}
+                        className="px-3 py-1.5 bg-white border border-slate-300 hover:border-slate-400 text-slate-700 rounded-lg text-xs font-semibold transition-colors"
+                      >
+                        Notes
+                      </Link>
+                    )}
+                    <Link
+                      href={
+                        rec.documentId
+                          ? `/quizzes?documentId=${rec.documentId}`
+                          : `/quizzes?subjectId=${rec.subjectId}`
+                      }
+                      className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold transition-colors flex items-center gap-1"
+                    >
+                      Practice
+                    </Link>
                   </div>
-                </Link>
-              ))}
-            </div>
-          ) : (
-            <div className="bg-white border border-[#E7DFD5] rounded-2xl p-8 text-center space-y-3 shadow-sm">
-              <BookOpen className="w-8 h-8 text-[#B58B83] mx-auto" />
-              <p className="text-sm text-[#252222] font-medium">No Subjects Created Yet</p>
-              <p className="text-xs text-[#6E5D59] max-w-sm mx-auto">
-                Create your first academic subject to categorize lectures and generate AI learning packs.
-              </p>
-              <button
-                onClick={() => setIsCreateSubjectOpen(true)}
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#652D3D] hover:bg-[#522431] text-[#F3EDE3] text-xs font-semibold cursor-pointer shadow-sm"
-              >
-                <Plus className="w-3.5 h-3.5" /> Create Subject
-              </button>
-            </div>
-          )}
-        </div>
-
-        {/* Right: Recent Learning Activity Feed */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Clock className="w-4 h-4 text-[#6E5D59]" />
-              <h2 className="text-base font-semibold text-[#252222]">Recent Activity</h2>
-            </div>
-            <Link
-              href="/analytics"
-              className="text-xs text-[#6E5D59] hover:text-[#252222] font-medium"
-            >
-              History
-            </Link>
-          </div>
-
-          <div className="bg-white border border-[#E7DFD5] rounded-2xl p-4 divide-y divide-[#EFE7DD] shadow-sm">
-            {data?.recentActivities && data.recentActivities.length > 0 ? (
-              data.recentActivities.map((act) => (
-                <div key={act.id} className="py-3 first:pt-1 last:pb-1 space-y-1">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-semibold uppercase tracking-wider text-[#652D3D]">
-                      {act.type.replace('_', ' ')}
-                    </span>
-                    <span className="text-[10px] text-[#6E5D59] font-mono">
-                      {formatRelativeTime(act.createdAt)}
-                    </span>
-                  </div>
-                  <p className="text-xs text-[#252222] leading-snug">{act.description}</p>
                 </div>
               ))
             ) : (
-              <div className="py-8 text-center text-xs text-[#6E5D59] italic">
-                No recent activity recorded yet.
+              <div className="p-6 text-center text-slate-500 text-xs">
+                Complete a quiz session to unlock AI-powered topic recommendations!
               </div>
             )}
           </div>
         </div>
+
+        {/* Weekly Progress Chart */}
+        <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <BarChart3 className="w-4 h-4 text-blue-600" />
+                <h3 className="text-sm font-bold text-slate-900">Weekly Progress</h3>
+              </div>
+              <span className="text-[11px] text-slate-500">Last 7 Days</span>
+            </div>
+
+            <div className="pt-4">
+              <p className="text-xs text-slate-500 mb-4">
+                Actual recorded learning time and quiz attempts:
+              </p>
+
+              {/* Simple pure CSS bar chart */}
+              <div className="flex items-end justify-between gap-2 h-36 pt-2">
+                {data?.weeklyProgress?.map((item, idx) => {
+                  const heightPercent =
+                    item.minutes > 0
+                      ? Math.min(100, Math.max(15, (item.minutes / maxWeeklyMinutes) * 100))
+                      : 6;
+
+                  return (
+                    <div key={idx} className="flex-1 flex flex-col items-center gap-1.5">
+                      <div className="text-[10px] text-slate-500 font-semibold">
+                        {item.minutes > 0 ? `${item.minutes}m` : ''}
+                      </div>
+                      <div className="w-full bg-slate-100 rounded-t-md h-24 flex items-end">
+                        <div
+                          className={`w-full rounded-t-md transition-all duration-300 ${
+                            item.minutes > 0 ? 'bg-blue-600 hover:bg-blue-700' : 'bg-slate-200'
+                          }`}
+                          style={{ height: `${heightPercent}%` }}
+                          title={`${item.day}: ${item.minutes} mins, ${item.quizzes} quizzes`}
+                        />
+                      </div>
+                      <span className="text-[11px] font-medium text-slate-600">{item.day}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          <div className="pt-4 mt-2 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+            <span>Total weekly study:</span>
+            <span className="font-bold text-slate-800">
+              {data?.weeklyProgress?.reduce((acc, curr) => acc + curr.minutes, 0) || 0} minutes
+            </span>
+          </div>
+        </div>
       </div>
 
-      {isUploadOpen && (
-        <DocumentUploadModal
-          isOpen={isUploadOpen}
-          onClose={() => setIsUploadOpen(false)}
-          onSuccess={() => {
-            setIsUploadOpen(false);
-            window.location.reload();
-          }}
-        />
-      )}
+      {/* 5. Recent Activity Feed */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+        <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
+          <div className="flex items-center gap-2">
+            <Clock className="w-4 h-4 text-slate-500" />
+            <h3 className="text-sm font-bold text-slate-900">Recent Academic Activity</h3>
+          </div>
+          <Link
+            href="/analytics"
+            className="text-xs font-semibold text-blue-600 hover:text-blue-800 flex items-center gap-1"
+          >
+            Full Analytics <ArrowRight className="w-3.5 h-3.5" />
+          </Link>
+        </div>
 
-      {isCreateSubjectOpen && (
-        <CreateSubjectModal
-          isOpen={isCreateSubjectOpen}
-          onClose={() => setIsCreateSubjectOpen(false)}
-          onSuccess={() => {
-            setIsCreateSubjectOpen(false);
-            window.location.reload();
-          }}
-        />
-      )}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Recent Uploads */}
+          <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
+            <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+              <FileText className="w-3.5 h-3.5 text-blue-600" /> Recent Documents
+            </h4>
+            <div className="space-y-2">
+              {data?.recentDocuments && data.recentDocuments.length > 0 ? (
+                data.recentDocuments.map((doc) => (
+                  <Link
+                    key={doc.id}
+                    href={`/documents/${doc.id}`}
+                    className="block p-2 rounded-lg bg-white border border-slate-200 hover:border-blue-300 transition-colors"
+                  >
+                    <p className="text-xs font-semibold text-slate-800 truncate">{doc.title}</p>
+                    <p className="text-[10px] text-slate-500 mt-0.5">
+                      {doc.subjectName || 'Document'} • {formatRelativeTime(doc.createdAt)}
+                    </p>
+                  </Link>
+                ))
+              ) : (
+                <p className="text-xs text-slate-400 p-2">No documents uploaded yet</p>
+              )}
+            </div>
+          </div>
+
+          {/* Recent Notes */}
+          <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
+            <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-teal-600" /> Generated Study Notes
+            </h4>
+            <div className="space-y-2">
+              {data?.recentNotes && data.recentNotes.length > 0 ? (
+                data.recentNotes.map((note) => (
+                  <div
+                    key={note.id}
+                    className="p-2 rounded-lg bg-white border border-slate-200"
+                  >
+                    <p className="text-xs font-semibold text-slate-800 truncate">{note.title}</p>
+                    <p className="text-[10px] text-slate-500 mt-0.5 truncate">
+                      {note.documentTitle} • {formatRelativeTime(note.createdAt)}
+                    </p>
+                  </div>
+                ))
+              ) : (
+                <p className="text-xs text-slate-400 p-2">No study notes generated yet</p>
+              )}
+            </div>
+          </div>
+
+          {/* Recent Quizzes */}
+          <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
+            <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+              <GraduationCap className="w-3.5 h-3.5 text-indigo-600" /> Completed Quizzes
+            </h4>
+            <div className="space-y-2">
+              {data?.recentQuizzes && data.recentQuizzes.length > 0 ? (
+                data.recentQuizzes.map((quiz) => (
+                  <Link
+                    key={quiz.id}
+                    href={`/quizzes?reviewId=${quiz.id}`}
+                    className="block p-2 rounded-lg bg-white border border-slate-200 hover:border-indigo-300 transition-colors"
+                  >
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-semibold text-slate-800 truncate">{quiz.title}</p>
+                      <span
+                        className={`text-[10px] font-bold px-1.5 py-0.2 rounded shrink-0 ${
+                          quiz.scorePercentage >= 70
+                            ? 'bg-emerald-100 text-emerald-800'
+                            : 'bg-red-100 text-red-800'
+                        }`}
+                      >
+                        {quiz.scorePercentage}%
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-slate-500 mt-0.5">
+                      {quiz.subjectName || 'Quiz'} • {formatRelativeTime(quiz.completedAt)}
+                    </p>
+                  </Link>
+                ))
+              ) : (
+                <p className="text-xs text-slate-400 p-2">No quizzes completed yet</p>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Upload Modal */}
+      <DocumentUploadModal
+        isOpen={isUploadOpen}
+        onClose={() => setIsUploadOpen(false)}
+        onSuccess={(newDocId) => {
+          setIsUploadOpen(false);
+          fetchDashboardData();
+          if (newDocId) {
+            window.location.href = `/documents/${newDocId}`;
+          }
+        }}
+      />
+
+      {/* Create Subject Modal */}
+      <CreateSubjectModal
+        isOpen={isCreateSubjectOpen}
+        onClose={() => setIsCreateSubjectOpen(false)}
+        onSuccess={(newSubjectId) => {
+          setIsCreateSubjectOpen(false);
+          fetchDashboardData();
+          if (newSubjectId) {
+            window.location.href = `/subjects/${newSubjectId}`;
+          }
+        }}
+      />
     </div>
   );
 }

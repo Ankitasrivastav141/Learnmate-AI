@@ -1,13 +1,18 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
+export const dynamic = 'force-dynamic';
+
 export async function POST(
   req: Request,
   { params }: { params: { id: string } }
 ) {
   try {
     const body = await req.json();
-    const { remembered } = body as { remembered: boolean };
+    const { remembered, difficulty } = body as {
+      remembered?: boolean;
+      difficulty?: 'Easy' | 'Medium' | 'Hard';
+    };
 
     const card = await prisma.flashcard.findUnique({
       where: { id: params.id },
@@ -22,6 +27,7 @@ export async function POST(
       data: {
         reviewCount: { increment: 1 },
         ...(remembered && { correctCount: { increment: 1 } }),
+        ...(difficulty && { difficulty }),
       },
     });
 

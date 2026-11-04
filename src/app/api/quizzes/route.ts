@@ -26,18 +26,27 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { documentId, subjectId, questionCount = 10 } = body;
+    const { documentId, subjectId, questionCount = 10, difficulty = 'Mixed' } = body;
 
     // Filter questions
-    const whereClause: { documentId?: string; document?: { subjectId?: string } } = {};
+    const whereClause: {
+      documentId?: string;
+      document?: { subjectId?: string };
+      difficulty?: string;
+    } = {};
+
     if (documentId) {
       whereClause.documentId = documentId;
     } else if (subjectId) {
       whereClause.document = { subjectId };
     }
 
+    if (difficulty && difficulty !== 'Mixed') {
+      whereClause.difficulty = difficulty;
+    }
+
     // Fetch questions
-    const allQuestions = await prisma.question.findMany({
+    let allQuestions = await prisma.question.findMany({
       where: whereClause,
       include: {
         document: {
@@ -49,16 +58,34 @@ export async function POST(req: Request) {
       },
     });
 
+    // Fallback if specific difficulty has no questions, try without difficulty constraint
+    if (allQuestions.length === 0 && difficulty !== 'Mixed') {
+      const fallbackWhere = { ...whereClause };
+      delete fallbackWhere.difficulty;
+      allQuestions = await prisma.question.findMany({
+        where: fallbackWhere,
+        include: {
+          document: {
+            select: { id: true, title: true, subjectId: true },
+          },
+          topic: {
+            select: { id: true, title: true },
+          },
+        },
+      });
+    }
+
     if (allQuestions.length === 0) {
       return NextResponse.json(
-        { error: 'No questions available for this selection. Upload a document first!' },
+        { error: 'No questions available for this selection. Upload a document or study resource first!' },
         { status: 400 }
       );
     }
 
-    // Shuffle and pick up to questionCount (standard 10)
+    // Shuffle and pick up to questionCount
+    const count = parseInt(String(questionCount), 10) || 10;
     const shuffled = [...allQuestions].sort(() => 0.5 - Math.random());
-    const selectedQuestions = shuffled.slice(0, Math.min(questionCount, shuffled.length));
+    const selectedQuestions = shuffled.slice(0, Math.min(count, shuffled.length));
 
     // Determine target subject & document for session tracking
     const finalSubjectId = subjectId || selectedQuestions[0]?.document?.subjectId || null;
@@ -80,7 +107,7 @@ export async function POST(req: Request) {
       },
     });
 
-    // Strip out correctAnswer from client questions payload
+    // Client questions payload (without correctAnswer)
     const clientQuestions = selectedQuestions.map((q) => {
       let parsedOptions: string[] = [];
       try {
@@ -95,6 +122,7 @@ export async function POST(req: Request) {
         options: parsedOptions,
         difficulty: q.difficulty,
         topic: q.topic?.title || 'General',
+        documentTitle: q.document?.title || 'Course Material',
       };
     });
 
@@ -103,6 +131,7 @@ export async function POST(req: Request) {
       title: session.title,
       totalQuestions: session.totalQuestions,
       questions: clientQuestions,
+      difficulty,
     });
   } catch (error) {
     console.error('Error starting quiz:', error);

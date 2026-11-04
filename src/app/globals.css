@@ -3,37 +3,37 @@
 @tailwind utilities;
 
 :root {
-  --background: 36 33% 96%; /* #FAF7F2 Warm Cream */
-  --foreground: 0 5% 14%; /* #252222 Black/Charcoal */
+  --background: 210 40% 98%; /* #F8FAFC Primary Background */
+  --foreground: 222 47% 11%; /* #0F172A Primary Text */
 }
 
 body {
-  background-color: #FAF7F2;
-  color: #252222;
+  background-color: #F8FAFC;
+  color: #0F172A;
   font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   -webkit-font-smoothing: antialiased;
 }
 
-/* Custom modern scrollbars in Light Theme Cream / Burgundy / Dusty Rose */
+/* Custom modern scrollbars in Modern Academic Slate/Navy Palette */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #EFE7DD;
+  background: #F1F5F9;
 }
 ::-webkit-scrollbar-thumb {
-  background: #B58B83;
+  background: #CBD5E1;
   border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #652D3D;
+  background: #2563EB;
 }
 
-/* Selection highlight in Burgundy / Cream */
+/* Selection highlight in Secondary Blue */
 ::selection {
-  background-color: #652D3D;
-  color: #F3EDE3;
+  background-color: #2563EB;
+  color: #FFFFFF;
 }
 
 /* 3D card perspective for flashcards */
@@ -54,7 +54,7 @@ body {
 @media print {
   body {
     background-color: #ffffff !important;
-    color: #1a1a1a !important;
+    color: #0F172A !important;
   }
   aside, header, nav, button {
     display: none !important;

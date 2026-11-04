@@ -9,56 +9,44 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        // User custom palette:
-        // Burgundy: #652D3D
-        // Cream: #F3EDE3
-        // Black: #252222
-        // Dusty Rose: #B58B83
-        burgundy: {
-          DEFAULT: '#652D3D',
-          hover: '#522431',
-          light: '#7e384c',
-          dark: '#3e1b25',
-          50: '#fbf7f8',
-          100: '#f5eaed',
-          200: '#edd8dd',
-          500: '#652D3D',
-          600: '#522431',
-          700: '#3e1b25',
-        },
-        cream: {
-          DEFAULT: '#F3EDE3',
-          light: '#faf7f2',
-          muted: '#ded4c5',
-          dark: '#c4b5a0',
-        },
-        charcoal: {
-          DEFAULT: '#252222',
-          dark: '#1a1818',
-          card: '#2c2727',
-          surface: '#332e2e',
-          border: '#443d3d',
-        },
-        dustyrose: {
-          DEFAULT: '#B58B83',
-          light: '#cbb0aa',
-          dark: '#936a62',
-          muted: 'rgba(181, 139, 131, 0.15)',
+        // Modern Academic Learning Palette:
+        navy: {
+          DEFAULT: '#172554',
+          hover: '#0f172a',
+          light: '#1e3a8a',
+          900: '#0f172a',
+          800: '#172554',
+          700: '#1e3a8a',
         },
         primary: {
-          DEFAULT: '#652D3D',
-          hover: '#522431',
-          50: '#fbf7f8',
-          100: '#f5eaed',
-          500: '#652D3D',
-          600: '#522431',
-          700: '#3e1b25',
+          DEFAULT: '#2563EB',
+          hover: '#1d4ed8',
+          light: '#3b82f6',
+          dark: '#1e40af',
+        },
+        teal: {
+          DEFAULT: '#0F766E',
+          hover: '#115e59',
+          light: '#14b8a6',
+          dark: '#134e4a',
+        },
+        slate: {
+          50: '#f8fafc',
+          100: '#f1f5f9',
+          200: '#e2e8f0',
+          300: '#cbd5e1',
+          400: '#94a3b8',
+          500: '#64748b',
+          600: '#475569',
+          700: '#334155',
+          800: '#1e293b',
+          900: '#0f172a',
         },
         sidebar: {
-          DEFAULT: '#1c1919',
-          foreground: '#F3EDE3',
-          border: '#383232',
-        }
+          DEFAULT: '#172554',
+          foreground: '#FFFFFF',
+          border: '#E2E8F0',
+        },
       },
       borderRadius: {
         lg: '0.75rem',
@@ -68,4 +56,4 @@ module.exports = {
     },
   },
   plugins: [],
-}
+};
