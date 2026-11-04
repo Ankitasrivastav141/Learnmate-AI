@@ -50,6 +50,11 @@ export function isNonAcademicItem(text: string): boolean {
   for (const pattern of NON_ACADEMIC_PATTERNS) {
     if (pattern.test(trimmed)) return true;
   }
+  // Reject binary noise, image markers, or random symbol strings
+  if (/PNG|JFIF|IHDR|IDAT|IEND|Adobe|Bitmap|Exif/i.test(trimmed)) return true;
+  const alphaChars = (trimmed.match(/[a-zA-Z0-9]/g) || []).length;
+  if (alphaChars / trimmed.length < 0.6 && trimmed.length > 4) return true;
+
   // Check if it looks like a person's name (e.g. "Firstname Lastname")
   if (/^[A-Z][a-z]+\s+[A-Z][a-z]+(?:,\s*[A-Za-z\s]+)?$/.test(trimmed)) {
     const academicWords = /\b(theory|curve|model|analysis|management|system|market|demand|supply|database|economics|function|process|design|structure|architecture|strategy|concept|pipeline|schema|index|query|table)\b/i;
@@ -285,7 +290,15 @@ function generateWithSemanticEngine(
     const tableRows: string[] = [];
     const plainLines: string[] = [];
 
-    for (const line of slide.lines) {
+    for (const rawLine of slide.lines) {
+      const line = rawLine.trim();
+      if (!line || isBoilerplateLine(line) || isNonAcademicItem(line)) continue;
+
+      // Filter out binary noise, image fragments, and symbol soup
+      const alphaNum = (line.match(/[a-zA-Z0-9\s]/g) || []).length;
+      if (alphaNum / line.length < 0.7 && line.length > 5) continue;
+      if (/PNG|IHDR|IDAT|IEND|JFIF|Adobe|Exif|Bitmap/i.test(line)) continue;
+
       const lower = line.toLowerCase();
 
       // Detect SQL queries
@@ -571,8 +584,9 @@ function cleanTopicTitle(raw: string, num: number): string {
     .replace(/^(?:FOUNDATIONS|DATA MODELING|DATA DESIGN|SQL FLUENCY|ANALYTICS|DATA PIPELINES|REAL-WORLD DECISIONS|INDIA CONTEXT|PITFALLS|WRAP-UP)[:\s-]*/i, '')
     .trim();
 
-  if (cleaned.length < 3 || isNonAcademicItem(cleaned)) {
-    return `Core Module ${num}`;
+  const alphaCount = (cleaned.match(/[a-zA-Z0-9\s]/g) || []).length;
+  if (cleaned.length < 3 || alphaCount / cleaned.length < 0.75 || isNonAcademicItem(cleaned)) {
+    return `Core Concept ${num}`;
   }
   return cleaned;
 }

@@ -39,6 +39,11 @@ function isBoilerplateLine(line: string): boolean {
   if (/^PM2-\d+.*\|.*HSB/i.test(trimmed)) return true; // repeated footer
   if (/^HSB\s*—\s*Product Management/i.test(trimmed)) return true;
   if (/^Dr\.\s*Anand\s*Fadte$/i.test(trimmed)) return true;
+  if (/Gopal\s*Naik/i.test(trimmed)) return true;
+  if (/PNG|JFIF|IHDR|IDAT|IEND|Adobe|Exif/i.test(trimmed)) return true;
+  // Filter symbol-heavy binary noise
+  const alphaCount = (trimmed.match(/[A-Za-z0-9]/g) || []).length;
+  if (alphaCount / trimmed.length < 0.55 && trimmed.length > 5) return true;
   return false;
 }
 
@@ -128,7 +133,19 @@ export async function parseDocumentFile(
           const text = await officeParser.parseOfficeAsync(buffer);
           extractedText = typeof text === 'string' ? text : JSON.stringify(text);
         } catch {
-          extractedText = buffer.toString('utf-8').replace(/[^\x20-\x7E\n\r\t]/g, ' ');
+          // If binary PPT format, safely extract printable English words without binary noise
+          const raw = buffer.toString('binary');
+          const matches = raw.match(/[A-Za-z0-9\s.,!?:;'\-"()$%]{5,}/g) || [];
+          extractedText = matches
+            .map((s) => s.trim())
+            .filter((s) => {
+              if (s.length < 5) return false;
+              if (!/[A-Za-z]{3,}/.test(s)) return false;
+              if (/PNG|IHDR|IDAT|IEND|JFIF|Exif|Adobe|Bitmap|Font|Times|Calibri/i.test(s)) return false;
+              const letterCount = (s.match(/[A-Za-z0-9\s]/g) || []).length;
+              return letterCount / s.length > 0.8;
+            })
+            .join('\n');
         }
 
         const rawBlocks = extractedText
