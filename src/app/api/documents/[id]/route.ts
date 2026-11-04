@@ -36,6 +36,9 @@ export async function GET(
         questions: {
           orderBy: { createdAt: 'asc' },
         },
+        personalNotes: {
+          orderBy: { updatedAt: 'desc' },
+        },
       },
     });
 

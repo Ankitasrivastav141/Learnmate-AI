@@ -47,6 +47,7 @@ model Document {
   questions    Question[]
   quizSessions QuizSession[]
   chunks       ResourceChunk[]
+  personalNotes PersonalNote[]
 }
 
 model Topic {
@@ -88,6 +89,18 @@ model Note {
 
   document        Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
   topic           Topic?   @relation(fields: [topicId], references: [id], onDelete: SetNull)
+}
+
+model PersonalNote {
+  id         String   @id @default(cuid())
+  documentId String
+  subjectId  String?
+  title      String?  @default("My Notes")
+  content    String   @default("")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
 }
 
 model Flashcard {

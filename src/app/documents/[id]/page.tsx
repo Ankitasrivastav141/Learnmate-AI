@@ -1,32 +1,30 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   FileText,
   BookOpen,
-  BrainCircuit,
   GraduationCap,
   Sparkles,
   ArrowLeft,
   RotateCcw,
   Copy,
   Check,
-  Code2,
-  ListFilter,
-  CheckCircle2,
-  AlertCircle,
-  Loader2,
-  Clock,
-  Layers,
-  Search,
-  Lightbulb,
-  X,
   Download,
   Bookmark,
-  ChevronRight,
   Zap,
+  Loader2,
+  Edit3,
+  Trash2,
+  Save,
+  CheckCircle2,
+  AlertCircle,
+  HelpCircle,
+  Sliders,
+  Play,
+  Share2,
 } from 'lucide-react';
 import { FlashcardDeck } from '@/components/FlashcardDeck';
 import { QuizRunner } from '@/components/QuizRunner';
@@ -55,13 +53,6 @@ interface DocumentDetail {
     title: string;
     summary: string | null;
   }>;
-  concepts: Array<{
-    id: string;
-    term: string;
-    definition: string;
-    importance: string;
-    topicId: string | null;
-  }>;
   notes: Array<{
     id: string;
     title: string;
@@ -85,9 +76,15 @@ interface DocumentDetail {
     difficulty: string;
     topic?: { title: string } | null;
   }>;
+  personalNotes?: Array<{
+    id: string;
+    content: string;
+    title?: string;
+    updatedAt: string;
+  }>;
 }
 
-type TabType = 'notes' | 'concepts' | 'flashcards' | 'quiz' | 'source';
+type TabType = 'notes' | 'my_notes' | 'flashcards' | 'quiz';
 
 export default function DocumentStudyHubPage({ params }: { params: { id: string } }) {
   const router = useRouter();
@@ -96,43 +93,23 @@ export default function DocumentStudyHubPage({ params }: { params: { id: string 
   const [activeTab, setActiveTab] = useState<TabType>('notes');
   const [selectedTopicId, setSelectedTopicId] = useState<string>('ALL');
   const [isRegenerating, setIsRegenerating] = useState(false);
+  const [showRegenerateConfirm, setShowRegenerateConfirm] = useState(false);
   const [copiedNoteId, setCopiedNoteId] = useState<string | null>(null);
   const [showQuickRevisionOnly, setShowQuickRevisionOnly] = useState(false);
 
-  // Quiz state
+  // Personal Notes state
+  const [personalNotesContent, setPersonalNotesContent] = useState('');
+  const [isSavingNotes, setIsSavingNotes] = useState(false);
+  const [lastSavedTime, setLastSavedTime] = useState<Date | null>(null);
+  const [notesSaveStatus, setNotesSaveStatus] = useState<'saved' | 'saving' | 'unsaved'>('saved');
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Quiz launcher state
+  const [quizQuestionCount, setQuizQuestionCount] = useState<number>(10);
+  const [quizDifficulty, setQuizDifficulty] = useState<string>('Mixed');
+  const [isStartingQuiz, setIsStartingQuiz] = useState(false);
   const [quizSessionId, setQuizSessionId] = useState<string | null>(null);
   const [quizQuestions, setQuizQuestions] = useState<any[]>([]);
-  const [isStartingQuiz, setIsStartingQuiz] = useState(false);
-
-  // AI Term Explainer state
-  const [lookupTerm, setLookupTerm] = useState('');
-  const [isLookingUp, setIsLookingUp] = useState(false);
-  const [termResult, setTermResult] = useState<any | null>(null);
-
-  const handleLookupTerm = async (termToLookup?: string) => {
-    const target = (termToLookup || lookupTerm).trim();
-    if (!target) return;
-    if (termToLookup) setLookupTerm(termToLookup);
-    setIsLookingUp(true);
-    try {
-      const res = await fetch('/api/ai/define-term', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          term: target,
-          context: `Document: ${doc?.title || ''}. Subject: ${doc?.subject?.name || ''}`,
-        }),
-      });
-      const data = await res.json();
-      if (data && !data.error) {
-        setTermResult(data);
-      }
-    } catch (e) {
-      console.error('Failed to lookup term:', e);
-    } finally {
-      setIsLookingUp(false);
-    }
-  };
 
   const loadDocument = () => {
     setIsLoading(true);
@@ -141,9 +118,20 @@ export default function DocumentStudyHubPage({ params }: { params: { id: string 
       .then((data) => {
         if (!data.error) {
           setDoc(data);
+          // Load existing personal notes if present
+          if (data.personalNotes && data.personalNotes.length > 0) {
+            setPersonalNotesContent(data.personalNotes[0].content || '');
+            setLastSavedTime(new Date(data.personalNotes[0].updatedAt));
+          } else {
+            // Check localStorage fallback
+            const localCached = localStorage.getItem(`learnmate_pnotes_${params.id}`);
+            if (localCached) {
+              setPersonalNotesContent(localCached);
+            }
+          }
         }
       })
-      .catch((err) => console.error('Error loading document:', err))
+      .catch((err) => console.error('Failed to load document study pack:', err))
       .finally(() => setIsLoading(false));
   };
 
@@ -151,59 +139,183 @@ export default function DocumentStudyHubPage({ params }: { params: { id: string 
     loadDocument();
   }, [params.id]);
 
+  // Handle personal notes change with debounced autosave
+  const handlePersonalNotesChange = (value: string) => {
+    setPersonalNotesContent(value);
+    setNotesSaveStatus('unsaved');
+    localStorage.setItem(`learnmate_pnotes_${params.id}`, value);
+
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+
+    saveTimeoutRef.current = setTimeout(async () => {
+      setNotesSaveStatus('saving');
+      setIsSavingNotes(true);
+      try {
+        await fetch(`/api/documents/${params.id}/personal-notes`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content: value }),
+        });
+        setNotesSaveStatus('saved');
+        setLastSavedTime(new Date());
+      } catch (err) {
+        console.error('Failed to autosave personal notes:', err);
+        setNotesSaveStatus('unsaved');
+      } finally {
+        setIsSavingNotes(false);
+      }
+    }, 1000);
+  };
+
+  // Explicit manual save
+  const handleManualSaveNotes = async () => {
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    setNotesSaveStatus('saving');
+    setIsSavingNotes(true);
+    try {
+      await fetch(`/api/documents/${params.id}/personal-notes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: personalNotesContent }),
+      });
+      setNotesSaveStatus('saved');
+      setLastSavedTime(new Date());
+    } catch (err) {
+      console.error('Failed to save personal notes:', err);
+      setNotesSaveStatus('unsaved');
+    } finally {
+      setIsSavingNotes(false);
+    }
+  };
+
+  // Clear personal notes
+  const handleClearPersonalNotes = async () => {
+    if (!confirm('Are you sure you want to clear your personal notes for this document?')) {
+      return;
+    }
+    setPersonalNotesContent('');
+    localStorage.removeItem(`learnmate_pnotes_${params.id}`);
+    try {
+      await fetch(`/api/documents/${params.id}/personal-notes`, {
+        method: 'DELETE',
+      });
+      setNotesSaveStatus('saved');
+      setLastSavedTime(new Date());
+    } catch (err) {
+      console.error('Failed to delete personal notes:', err);
+    }
+  };
+
+  // Copy personal notes to clipboard
+  const handleCopyPersonalNotes = () => {
+    if (!personalNotesContent) return;
+    navigator.clipboard.writeText(personalNotesContent);
+    alert('Personal notes copied to clipboard!');
+  };
+
+  // Download personal notes as file
+  const handleDownloadPersonalNotes = () => {
+    if (!personalNotesContent) return;
+    const blob = new Blob([personalNotesContent], { type: 'text/markdown;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${doc?.title || 'Study'}_Personal_Notes.md`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // Insert formatting into personal notes
+  const insertFormatting = (prefix: string, suffix: string = '') => {
+    const textarea = document.getElementById('personal-notes-editor') as HTMLTextAreaElement | null;
+    if (!textarea) return;
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const selected = textarea.value.substring(start, end);
+    const replacement = `${prefix}${selected || 'text'}${suffix}`;
+
+    const newContent = textarea.value.substring(0, start) + replacement + textarea.value.substring(end);
+    handlePersonalNotesChange(newContent);
+
+    setTimeout(() => {
+      textarea.focus();
+      textarea.setSelectionRange(start + prefix.length, start + prefix.length + (selected ? selected.length : 4));
+    }, 50);
+  };
+
+  // Copy AI notes
+  const handleCopyNote = (noteId: string, content: string) => {
+    navigator.clipboard.writeText(content);
+    setCopiedNoteId(noteId);
+    setTimeout(() => setCopiedNoteId(null), 2000);
+  };
+
+  // Download Complete Notes
+  const handleDownloadNotes = () => {
+    if (!doc || doc.notes.length === 0) return;
+    const consolidated = doc.notes
+      .map((n) => `# ${n.title}\n\n${n.markdownContent}`)
+      .join('\n\n---\n\n');
+
+    const blob = new Blob([consolidated], { type: 'text/markdown;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${doc.title.replace(/[^a-zA-Z0-9_-]/g, '_')}_Study_Notes.md`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // Regenerate AI Notes with confirmation
   const handleRegenerate = async () => {
-    if (!confirm('Regenerate all notes, flashcards, and quizzes using the AI engine?')) return;
+    setShowRegenerateConfirm(false);
     setIsRegenerating(true);
     try {
-      const res = await fetch(`/api/documents/${params.id}/regenerate`, { method: 'POST' });
+      const res = await fetch(`/api/documents/${params.id}/regenerate`, {
+        method: 'POST',
+      });
       if (res.ok) {
         loadDocument();
+      } else {
+        const data = await res.json();
+        alert(data.error || 'Failed to regenerate study notes');
       }
     } catch (err) {
       console.error('Failed to regenerate:', err);
+      alert('An error occurred while regenerating notes.');
     } finally {
       setIsRegenerating(false);
     }
   };
 
-  const handleCopyNote = (id: string, text: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedNoteId(id);
-    setTimeout(() => setCopiedNoteId(null), 2000);
-  };
-
-  const handleDownloadNotes = () => {
-    if (!doc || doc.notes.length === 0) return;
-    const allNotesText = doc.notes
-      .map((n) => `${n.title}\n${'='.repeat(n.title.length)}\n\n${n.markdownContent}\n\n`)
-      .join('\n---\n\n');
-
-    const blob = new Blob([allNotesText], { type: 'text/markdown;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', `${doc.title.replace(/[^a-zA-Z0-9_-]/g, '_')}_Notes.md`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-  };
-
-  const startQuiz = async () => {
+  // Start Practice Quiz
+  const startQuiz = async (customCount?: number, customDiff?: string) => {
     setIsStartingQuiz(true);
     try {
+      const count = customCount || quizQuestionCount;
+      const diff = customDiff || quizDifficulty;
       const res = await fetch('/api/quizzes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ documentId: params.id, questionCount: 10 }),
+        body: JSON.stringify({
+          documentId: doc?.id,
+          questionCount: count,
+          difficulty: diff,
+        }),
       });
       const data = await res.json();
       if (data.sessionId && data.questions) {
         setQuizSessionId(data.sessionId);
         setQuizQuestions(data.questions);
+      } else if (data.error) {
+        alert(data.error);
       }
     } catch (err) {
       console.error('Failed to launch quiz:', err);
+      alert('Failed to start quiz. Please try again.');
     } finally {
       setIsStartingQuiz(false);
     }
@@ -211,9 +323,9 @@ export default function DocumentStudyHubPage({ params }: { params: { id: string 
 
   if (isLoading) {
     return (
-      <div className="py-24 text-center text-slate-500 text-xs flex flex-col items-center gap-3">
+      <div className="py-24 text-center text-[#64748B] text-xs flex flex-col items-center gap-3">
         <Loader2 className="w-6 h-6 animate-spin text-[#1E3A8A]" />
-        <span>Loading AI Study Pack...</span>
+        <span>Loading study materials...</span>
       </div>
     );
   }
@@ -221,8 +333,8 @@ export default function DocumentStudyHubPage({ params }: { params: { id: string 
   if (!doc) {
     return (
       <div className="py-20 text-center space-y-3">
-        <h2 className="text-lg font-bold text-slate-900">Document Not Found</h2>
-        <Link href="/documents" className="text-xs text-[#2563EB] hover:underline">
+        <h2 className="text-lg font-bold text-[#111827]">Document Not Found</h2>
+        <Link href="/documents" className="text-xs text-[#2563EB] hover:underline font-semibold">
           Return to documents directory
         </Link>
       </div>
@@ -232,12 +344,9 @@ export default function DocumentStudyHubPage({ params }: { params: { id: string 
   const filteredNotes = doc.notes.filter(
     (n) => selectedTopicId === 'ALL' || n.topicId === selectedTopicId
   );
-  const filteredConcepts = doc.concepts.filter(
-    (c) => selectedTopicId === 'ALL' || c.topicId === selectedTopicId
-  );
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-200">
+    <div className="space-y-6 animate-in fade-in duration-200 max-w-6xl mx-auto">
       {/* 1. Top Breadcrumb & Actions */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-2 text-xs text-[#64748B]">
@@ -259,13 +368,13 @@ export default function DocumentStudyHubPage({ params }: { params: { id: string 
           <button
             onClick={handleDownloadNotes}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-white hover:bg-slate-50 text-[#111827] border border-[#E2E8F0] shadow-sm transition-colors cursor-pointer"
-            title="Download Notes as Markdown / Text"
+            title="Download Notes as Markdown"
           >
             <Download className="w-3.5 h-3.5 text-[#2563EB]" />
             Download Notes
           </button>
           <button
-            onClick={handleRegenerate}
+            onClick={() => setShowRegenerateConfirm(true)}
             disabled={isRegenerating}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-white hover:bg-slate-50 text-[#111827] border border-[#E2E8F0] shadow-sm transition-colors disabled:opacity-50 cursor-pointer"
           >
@@ -274,6 +383,39 @@ export default function DocumentStudyHubPage({ params }: { params: { id: string 
           </button>
         </div>
       </div>
+
+      {/* Confirmation Modal for Regeneration */}
+      {showRegenerateConfirm && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-[#E2E8F0] space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl bg-blue-50 text-[#1E3A8A] flex items-center justify-center shrink-0">
+                <RotateCcw className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-bold text-base text-[#111827]">Regenerate Study Notes?</h3>
+                <p className="text-xs text-[#64748B] mt-1 leading-relaxed">
+                  This will re-analyze &quot;{doc.title}&quot; using Gemini and produce an updated, consolidated study notes document and practice quiz. Existing personal notes will remain safe.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#E2E8F0]">
+              <button
+                onClick={() => setShowRegenerateConfirm(false)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-[#64748B] hover:bg-slate-100 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleRegenerate}
+                className="px-4 py-2 rounded-xl text-xs font-semibold bg-[#1E3A8A] hover:bg-[#1e40af] text-white shadow-sm cursor-pointer"
+              >
+                Yes, Regenerate Notes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 2. Document Overview Banner */}
       <div className="bg-white border border-[#E2E8F0] rounded-2xl p-6 shadow-sm space-y-4">
@@ -288,7 +430,7 @@ export default function DocumentStudyHubPage({ params }: { params: { id: string 
               </h1>
             </div>
             <p className="text-xs text-[#64748B] leading-relaxed max-w-3xl">
-              {doc.summary || 'Academic study pack automatically indexed and grounded from uploaded material.'}
+              {doc.summary || 'Academic study pack automatically indexed and grounded from uploaded lecture materials.'}
             </p>
           </div>
 
@@ -299,16 +441,16 @@ export default function DocumentStudyHubPage({ params }: { params: { id: string 
             </div>
             <div className="px-3 py-1.5 rounded-xl bg-[#F8FAFC] border border-[#E2E8F0] text-center">
               <span className="text-[#111827] font-bold block">{doc.notes.length}</span>
-              <span className="text-[10px] text-[#64748B]">Notes</span>
+              <span className="text-[10px] text-[#64748B]">Study Notes</span>
             </div>
             <div className="px-3 py-1.5 rounded-xl bg-[#F8FAFC] border border-[#E2E8F0] text-center">
               <span className="text-[#111827] font-bold block">{doc.questions.length}</span>
-              <span className="text-[10px] text-[#64748B]">MCQs</span>
+              <span className="text-[10px] text-[#64748B]">Questions</span>
             </div>
           </div>
         </div>
 
-        {/* Navigation Tabs Bar */}
+        {/* Navigation Tabs Bar: Strictly Study Notes | My Notes | Flashcards | Practice Quiz */}
         <div className="flex items-center gap-2 pt-2 border-t border-[#E2E8F0] overflow-x-auto">
           <button
             onClick={() => setActiveTab('notes')}
@@ -319,19 +461,22 @@ export default function DocumentStudyHubPage({ params }: { params: { id: string 
             }`}
           >
             <FileText className="w-3.5 h-3.5" />
-            Study Notes ({doc.notes.length})
+            Study Notes
           </button>
 
           <button
-            onClick={() => setActiveTab('concepts')}
+            onClick={() => setActiveTab('my_notes')}
             className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all shrink-0 cursor-pointer ${
-              activeTab === 'concepts'
+              activeTab === 'my_notes'
                 ? 'bg-[#1E3A8A] text-white shadow-sm'
                 : 'text-[#475569] hover:text-[#111827] hover:bg-slate-50'
             }`}
           >
-            <BrainCircuit className="w-3.5 h-3.5" />
-            Key Concepts ({doc.concepts.length})
+            <Edit3 className="w-3.5 h-3.5" />
+            My Notes
+            {personalNotesContent.trim() && (
+              <span className="w-2 h-2 rounded-full bg-[#2563EB]" />
+            )}
           </button>
 
           <button
@@ -347,10 +492,7 @@ export default function DocumentStudyHubPage({ params }: { params: { id: string 
           </button>
 
           <button
-            onClick={() => {
-              setActiveTab('quiz');
-              if (!quizSessionId) startQuiz();
-            }}
+            onClick={() => setActiveTab('quiz')}
             className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all shrink-0 cursor-pointer ${
               activeTab === 'quiz'
                 ? 'bg-[#1E3A8A] text-white shadow-sm'
@@ -360,25 +502,13 @@ export default function DocumentStudyHubPage({ params }: { params: { id: string 
             <GraduationCap className="w-3.5 h-3.5" />
             Practice Quiz
           </button>
-
-          <button
-            onClick={() => setActiveTab('source')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all shrink-0 cursor-pointer ${
-              activeTab === 'source'
-                ? 'bg-[#1E3A8A] text-white shadow-sm'
-                : 'text-[#475569] hover:text-[#111827] hover:bg-slate-50'
-            }`}
-          >
-            <Code2 className="w-3.5 h-3.5" />
-            Extracted Text
-          </button>
         </div>
       </div>
 
-      {/* 3. TAB 1: STUDY NOTES (DIGITAL TEXTBOOK REDESIGN) */}
+      {/* 3. TAB 1: STUDY NOTES (DIGITAL TEXTBOOK PRESENTATION) */}
       {activeTab === 'notes' && (
         <div className="space-y-6">
-          {/* Notes Controls & Table of Contents Bar */}
+          {/* Notes Controls Bar */}
           <div className="bg-white border border-[#E2E8F0] rounded-2xl p-4 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
             {/* Clickable Table of Contents Jump Links */}
             <div className="flex items-center gap-2 overflow-x-auto py-1">
@@ -393,7 +523,7 @@ export default function DocumentStudyHubPage({ params }: { params: { id: string 
                     : 'text-[#475569] hover:text-[#111827] hover:bg-slate-100'
                 }`}
               >
-                All Topics ({doc.notes.length})
+                All Sections
               </button>
               {doc.topics.map((t) => (
                 <button
@@ -427,136 +557,183 @@ export default function DocumentStudyHubPage({ params }: { params: { id: string 
             </div>
           </div>
 
-          {/* Render Notes with MarkdownRenderer */}
+          {/* Render Notes with MarkdownRenderer (Zero raw markdown symbols) */}
           {filteredNotes.length > 0 ? (
-            filteredNotes.map((note) => (
-              <article
-                key={note.id}
-                id={`note-${note.id}`}
-                className="bg-white border border-[#E2E8F0] rounded-2xl p-6 md:p-10 shadow-sm space-y-6"
-              >
-                <div className="flex items-center justify-between border-b border-[#E2E8F0] pb-4">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center text-[#1E3A8A]">
-                      <BookOpen className="w-4 h-4" />
+            <div className="space-y-6">
+              {filteredNotes.map((note) => (
+                <article
+                  key={note.id}
+                  id={`note-${note.id}`}
+                  className="bg-white border border-[#E2E8F0] rounded-2xl p-6 md:p-10 shadow-sm space-y-6"
+                >
+                  <div className="flex items-center justify-between border-b border-[#E2E8F0] pb-4">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center text-[#1E3A8A]">
+                        <BookOpen className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h2 className="text-lg font-bold text-[#111827]">
+                          {note.title}
+                        </h2>
+                        <span className="text-[11px] text-[#64748B]">Digital Textbook Notes</span>
+                      </div>
                     </div>
-                    <div>
-                      <h2 className="text-lg font-bold text-[#111827]">
-                        {note.title}
-                      </h2>
-                      <span className="text-[11px] text-[#64748B]">Digital Textbook Notes</span>
-                    </div>
+
+                    <button
+                      onClick={() => handleCopyNote(note.id, note.markdownContent)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-50 border border-[#E2E8F0] text-xs font-semibold text-[#111827] hover:bg-slate-100 transition-colors cursor-pointer"
+                    >
+                      {copiedNoteId === note.id ? (
+                        <>
+                          <Check className="w-3.5 h-3.5 text-[#15803D]" /> Copied!
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3.5 h-3.5 text-[#64748B]" /> Copy Notes
+                        </>
+                      )}
+                    </button>
                   </div>
 
-                  <button
-                    onClick={() => handleCopyNote(note.id, note.markdownContent)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-50 border border-[#E2E8F0] text-xs font-semibold text-[#111827] hover:bg-slate-100 transition-colors cursor-pointer"
-                  >
-                    {copiedNoteId === note.id ? (
-                      <>
-                        <Check className="w-3.5 h-3.5 text-[#15803D]" /> Copied!
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="w-3.5 h-3.5 text-[#64748B]" /> Copy Notes
-                      </>
-                    )}
-                  </button>
-                </div>
-
-                {/* Professional Rich-Text Textbook Renderer */}
-                <MarkdownRenderer content={note.markdownContent} />
-              </article>
-            ))
+                  {/* Professional Rich-Text Textbook Renderer */}
+                  <MarkdownRenderer content={note.markdownContent} />
+                </article>
+              ))}
+            </div>
           ) : (
             <div className="bg-white border border-[#E2E8F0] rounded-2xl p-12 text-center text-xs text-[#64748B] shadow-sm">
-              No study notes found for this topic filter.
+              No study notes found for this section.
             </div>
           )}
         </div>
       )}
 
-      {/* 4. TAB 2: KEY CONCEPTS */}
-      {activeTab === 'concepts' && (
-        <div className="space-y-4">
-          {/* Simple Term Lookup */}
-          <div className="bg-white border border-[#E2E8F0] rounded-2xl p-4 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      {/* 4. TAB 2: MY NOTES (PERSONAL SELF NOTES EDITOR) */}
+      {activeTab === 'my_notes' && (
+        <div className="bg-white border border-[#E2E8F0] rounded-2xl p-6 md:p-8 shadow-sm space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#E2E8F0] pb-4">
             <div>
-              <h3 className="text-sm font-bold text-[#111827]">Important Concepts & Terminology</h3>
-              <p className="text-xs text-[#64748B]">Definitions and core theories extracted from your material</p>
+              <h3 className="text-base font-bold text-[#111827] flex items-center gap-2">
+                <Edit3 className="w-4 h-4 text-[#2563EB]" />
+                Personal Study Notes
+              </h3>
+              <p className="text-xs text-[#64748B] mt-0.5">
+                Write your own notes, key thoughts, and exam revisions while studying this document.
+              </p>
             </div>
 
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                handleLookupTerm();
-              }}
-              className="flex items-center gap-2"
-            >
-              <div className="relative">
-                <Search className="w-3.5 h-3.5 text-[#94A3B8] absolute left-3 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  placeholder="Explain any term..."
-                  value={lookupTerm}
-                  onChange={(e) => setLookupTerm(e.target.value)}
-                  className="pl-8 pr-3 py-1.5 rounded-xl border border-[#E2E8F0] bg-slate-50 text-xs text-[#111827] focus:outline-none focus:ring-2 focus:ring-[#2563EB] w-48 sm:w-60"
-                />
-              </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-[11px] text-[#64748B] flex items-center gap-1 mr-2">
+                {notesSaveStatus === 'saving' ? (
+                  <>
+                    <Loader2 className="w-3 h-3 animate-spin text-[#2563EB]" /> Saving...
+                  </>
+                ) : notesSaveStatus === 'saved' ? (
+                  <>
+                    <CheckCircle2 className="w-3 h-3 text-[#15803D]" />
+                    {lastSavedTime ? `Saved ${lastSavedTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Saved'}
+                  </>
+                ) : (
+                  <span className="text-amber-600 font-medium">Unsaved changes</span>
+                )}
+              </span>
+
               <button
-                type="submit"
-                disabled={isLookingUp || !lookupTerm.trim()}
-                className="px-3 py-1.5 bg-[#1E3A8A] hover:bg-[#1e40af] text-white rounded-xl text-xs font-semibold disabled:opacity-50 transition-colors"
+                onClick={handleManualSaveNotes}
+                disabled={isSavingNotes}
+                className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-[#1E3A8A] hover:bg-[#1e40af] text-white flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
               >
-                {isLookingUp ? 'Defining...' : 'Explain'}
+                <Save className="w-3.5 h-3.5" /> Save
               </button>
-            </form>
+              <button
+                onClick={handleCopyPersonalNotes}
+                disabled={!personalNotesContent.trim()}
+                className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-white border border-[#E2E8F0] text-[#111827] hover:bg-slate-50 flex items-center gap-1.5 transition-colors disabled:opacity-50 cursor-pointer"
+              >
+                <Copy className="w-3.5 h-3.5 text-[#64748B]" /> Copy
+              </button>
+              <button
+                onClick={handleDownloadPersonalNotes}
+                disabled={!personalNotesContent.trim()}
+                className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-white border border-[#E2E8F0] text-[#111827] hover:bg-slate-50 flex items-center gap-1.5 transition-colors disabled:opacity-50 cursor-pointer"
+              >
+                <Download className="w-3.5 h-3.5 text-[#2563EB]" /> Download
+              </button>
+              <button
+                onClick={handleClearPersonalNotes}
+                disabled={!personalNotesContent.trim()}
+                className="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50 cursor-pointer"
+                title="Clear Notes"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            </div>
           </div>
 
-          {/* Definition Result Card */}
-          {termResult && (
-            <div className="bg-blue-50/70 border border-blue-200 rounded-xl p-4 space-y-2 animate-in fade-in duration-200">
-              <div className="flex items-center justify-between">
-                <h4 className="font-bold text-sm text-[#1E3A8A]">{termResult.term}</h4>
-                <button
-                  onClick={() => setTermResult(null)}
-                  className="text-slate-400 hover:text-slate-700"
-                >
-                  <X className="w-4 h-4" />
-                </button>
+          {/* Simple Formatting Toolbar */}
+          <div className="flex items-center gap-1.5 py-2 px-3 bg-[#F8FAFC] rounded-xl border border-[#E2E8F0] overflow-x-auto text-xs">
+            <span className="text-[11px] font-semibold text-[#64748B] mr-2 shrink-0">Format:</span>
+            <button
+              onClick={() => insertFormatting('## ', '\n')}
+              className="px-2 py-1 rounded hover:bg-slate-200 font-bold text-[#111827]"
+              title="Heading 2"
+            >
+              H2
+            </button>
+            <button
+              onClick={() => insertFormatting('### ', '\n')}
+              className="px-2 py-1 rounded hover:bg-slate-200 font-bold text-[#111827]"
+              title="Heading 3"
+            >
+              H3
+            </button>
+            <button
+              onClick={() => insertFormatting('**', '**')}
+              className="px-2 py-1 rounded hover:bg-slate-200 font-bold text-[#111827]"
+              title="Bold"
+            >
+              B
+            </button>
+            <button
+              onClick={() => insertFormatting('*', '*')}
+              className="px-2 py-1 rounded hover:bg-slate-200 italic font-serif text-[#111827]"
+              title="Italic"
+            >
+              I
+            </button>
+            <button
+              onClick={() => insertFormatting('- ', '\n')}
+              className="px-2 py-1 rounded hover:bg-slate-200 text-[#111827]"
+              title="Bulleted List"
+            >
+              • List
+            </button>
+            <button
+              onClick={() => insertFormatting('1. ', '\n')}
+              className="px-2 py-1 rounded hover:bg-slate-200 text-[#111827]"
+              title="Numbered List"
+            >
+              1. List
+            </button>
+          </div>
+
+          {/* Personal Notes Textarea Editor */}
+          <textarea
+            id="personal-notes-editor"
+            value={personalNotesContent}
+            onChange={(e) => handlePersonalNotesChange(e.target.value)}
+            placeholder="Type your notes here... You can use headings, bullets, questions to ask the professor, or summaries of what you read."
+            className="w-full min-h-[380px] p-4 text-sm text-[#111827] bg-[#FFFFFF] border border-[#E2E8F0] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2563EB] leading-relaxed font-sans resize-y"
+          />
+
+          {personalNotesContent.trim() && (
+            <div className="pt-4 border-t border-[#E2E8F0] space-y-2">
+              <h4 className="text-xs font-bold text-[#64748B] uppercase tracking-wider">Preview</h4>
+              <div className="p-4 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl">
+                <MarkdownRenderer content={personalNotesContent} />
               </div>
-              <p className="text-xs text-[#111827] leading-relaxed">{termResult.definition}</p>
-              {termResult.plainEnglish && (
-                <p className="text-xs text-blue-900 bg-white/70 p-2 rounded-lg border border-blue-100">
-                  <strong>In Plain English:</strong> {termResult.plainEnglish}
-                </p>
-              )}
             </div>
           )}
-
-          {/* Concepts Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {filteredConcepts.length > 0 ? (
-              filteredConcepts.map((concept) => (
-                <div
-                  key={concept.id}
-                  className="bg-white border border-[#E2E8F0] rounded-xl p-5 space-y-2 shadow-sm hover:border-[#2563EB] transition-colors"
-                >
-                  <div className="flex items-center justify-between">
-                    <h4 className="font-bold text-[#111827] text-sm">{concept.term}</h4>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-[#1E3A8A] border border-blue-200">
-                      {concept.importance || 'Key Concept'}
-                    </span>
-                  </div>
-                  <p className="text-xs text-[#64748B] leading-relaxed">{concept.definition}</p>
-                </div>
-              ))
-            ) : (
-              <div className="col-span-2 bg-white border border-[#E2E8F0] rounded-2xl p-12 text-center text-xs text-[#64748B]">
-                No concepts found for this selection.
-              </div>
-            )}
-          </div>
         </div>
       )}
 
@@ -587,7 +764,7 @@ export default function DocumentStudyHubPage({ params }: { params: { id: string 
           {isStartingQuiz ? (
             <div className="bg-white border border-[#E2E8F0] rounded-2xl p-12 text-center text-[#64748B] text-xs">
               <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2 text-[#1E3A8A]" />
-              Preparing 10-Question Practice Quiz...
+              Preparing Practice Quiz for &quot;{doc.title}&quot;...
             </div>
           ) : quizSessionId && quizQuestions.length > 0 ? (
             <QuizRunner
@@ -597,35 +774,60 @@ export default function DocumentStudyHubPage({ params }: { params: { id: string 
               onRetake={() => startQuiz()}
             />
           ) : (
-            <div className="bg-white border border-[#E2E8F0] rounded-2xl p-12 text-center space-y-3">
-              <GraduationCap className="w-8 h-8 text-[#1E3A8A] mx-auto" />
-              <h3 className="font-bold text-sm text-[#111827]">Practice Quiz on {doc.title}</h3>
-              <p className="text-xs text-[#64748B] max-w-sm mx-auto">
-                Test your comprehension with 10 questions grounded directly in this lecture presentation.
-              </p>
+            <div className="bg-white border border-[#E2E8F0] rounded-2xl p-8 md:p-12 text-center max-w-xl mx-auto shadow-sm space-y-5">
+              <div className="w-12 h-12 rounded-2xl bg-blue-50 text-[#1E3A8A] flex items-center justify-center mx-auto">
+                <GraduationCap className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="font-bold text-lg text-[#111827]">Practice Quiz on {doc.title}</h3>
+                <p className="text-xs text-[#64748B] mt-1 max-w-sm mx-auto leading-relaxed">
+                  Test your understanding with questions grounded directly in this lecture presentation. You will receive detailed explanations and mistake analysis upon submission.
+                </p>
+              </div>
+
+              {/* Quiz Configuration Controls */}
+              <div className="grid grid-cols-2 gap-4 text-left p-4 bg-[#F8FAFC] rounded-xl border border-[#E2E8F0]">
+                <div>
+                  <label className="block text-[11px] font-bold text-[#111827] mb-1">
+                    Number of Questions
+                  </label>
+                  <select
+                    value={quizQuestionCount}
+                    onChange={(e) => setQuizQuestionCount(Number(e.target.value))}
+                    className="w-full text-xs bg-white border border-[#E2E8F0] rounded-lg px-2.5 py-1.5 text-[#111827] focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
+                  >
+                    <option value={5}>5 Questions (Quick Review)</option>
+                    <option value={10}>10 Questions (Standard)</option>
+                    <option value={15}>15 Questions (Deep Test)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-[#111827] mb-1">
+                    Difficulty Level
+                  </label>
+                  <select
+                    value={quizDifficulty}
+                    onChange={(e) => setQuizDifficulty(e.target.value)}
+                    className="w-full text-xs bg-white border border-[#E2E8F0] rounded-lg px-2.5 py-1.5 text-[#111827] focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
+                  >
+                    <option value="Mixed">Mixed (Recommended)</option>
+                    <option value="Easy">Foundational (Easy)</option>
+                    <option value="Medium">Standard (Medium)</option>
+                    <option value="Hard">Advanced (Hard)</option>
+                  </select>
+                </div>
+              </div>
+
               <button
-                onClick={startQuiz}
-                className="px-5 py-2.5 bg-[#1E3A8A] hover:bg-[#1e40af] text-white rounded-xl text-xs font-semibold shadow-sm transition-colors cursor-pointer"
+                onClick={() => startQuiz()}
+                className="w-full py-3 bg-[#1E3A8A] hover:bg-[#1e40af] text-white rounded-xl text-xs font-semibold shadow-sm transition-colors cursor-pointer flex items-center justify-center gap-2"
               >
-                Start Practice Quiz
+                <Play className="w-4 h-4 fill-white" />
+                Start Practice Quiz Now
               </button>
             </div>
           )}
-        </div>
-      )}
-
-      {/* 7. TAB 5: EXTRACTED TEXT */}
-      {activeTab === 'source' && (
-        <div className="bg-white border border-[#E2E8F0] rounded-2xl p-6 shadow-sm space-y-3">
-          <div className="flex items-center justify-between border-b border-[#E2E8F0] pb-3">
-            <h3 className="font-bold text-sm text-[#111827]">Extracted Text</h3>
-            <span className="text-xs text-[#64748B] font-mono">
-              {doc.rawText.length.toLocaleString()} characters
-            </span>
-          </div>
-          <pre className="p-4 bg-[#F8FAFC] rounded-xl text-xs text-slate-700 whitespace-pre-wrap font-mono max-h-[500px] overflow-y-auto leading-relaxed border border-[#E2E8F0]">
-            {doc.rawText}
-          </pre>
         </div>
       )}
     </div>

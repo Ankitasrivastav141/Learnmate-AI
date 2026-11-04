@@ -178,50 +178,35 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* 2. Overview Statistics (6 metrics) */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-        <MetricsCard
-          title="Total Subjects"
-          value={summary.totalSubjects}
-          subtitle="Enrolled courses"
-          icon={<BookOpen className="w-5 h-5" />}
-          color="#2563EB"
-        />
-        <MetricsCard
-          title="Study Documents"
-          value={summary.totalDocuments}
-          subtitle="Processed slides & docs"
-          icon={<FileText className="w-5 h-5" />}
-          color="#0F766E"
-        />
-        <MetricsCard
-          title="Quizzes Done"
-          value={summary.completedQuizzesCount}
-          subtitle="Completed sessions"
-          icon={<GraduationCap className="w-5 h-5" />}
-          color="#4F46E5"
-        />
-        <MetricsCard
-          title="Average Score"
-          value={summary.averageScore ? `${summary.averageScore}%` : 'N/A'}
-          subtitle={summary.averageScore >= 75 ? 'Strong standing' : 'Needs practice'}
-          icon={<Award className="w-5 h-5" />}
-          color={summary.averageScore >= 75 ? '#15803D' : '#D97706'}
-        />
-        <MetricsCard
-          title="Study Sessions"
-          value={summary.totalStudySessions}
-          subtitle="Recorded learning"
-          icon={<Clock className="w-5 h-5" />}
-          color="#0284C7"
-        />
-        <MetricsCard
-          title="Topics Mastered"
-          value={summary.topicsCompleted}
-          subtitle="Document units"
-          icon={<Layers className="w-5 h-5" />}
-          color="#7C3AED"
-        />
+      {/* 2. Overview Statistics (Strictly 3 Core Metrics) */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Link href="/quizzes" className="block group">
+          <MetricsCard
+            title="Average Quiz Score"
+            value={summary.averageScore ? `${summary.averageScore}%` : 'N/A'}
+            subtitle={summary.averageScore >= 75 ? 'Strong performance' : 'Review recent mistakes'}
+            icon={<Award className="w-5 h-5" />}
+            color={summary.averageScore >= 75 ? '#15803D' : '#2563EB'}
+          />
+        </Link>
+        <Link href="/subjects" className="block group">
+          <MetricsCard
+            title="Total Subjects"
+            value={summary.totalSubjects}
+            subtitle="Academic workspaces"
+            icon={<BookOpen className="w-5 h-5" />}
+            color="#1E3A8A"
+          />
+        </Link>
+        <Link href="/documents" className="block group">
+          <MetricsCard
+            title="Study Documents"
+            value={summary.totalDocuments}
+            subtitle="Uploaded study materials"
+            icon={<FileText className="w-5 h-5" />}
+            color="#2563EB"
+          />
+        </Link>
       </div>
 
       {/* 3. Continue Learning Section */}

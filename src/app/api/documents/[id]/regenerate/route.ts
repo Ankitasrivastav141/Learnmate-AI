@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { generateLearningMaterialFromDocument } from '@/lib/ai-service';
+import { generateLearningMaterialFromDocument, isNonAcademicItem } from '@/lib/ai-service';
 
 export async function POST(
   req: Request,
@@ -40,10 +40,11 @@ export async function POST(
       await tx.question.deleteMany({ where: { documentId: document.id } });
       await tx.topic.deleteMany({ where: { documentId: document.id } });
 
-      // Insert Topics
+      // Insert Topics (filter non-academic items like teacher names, roadmaps)
+      const validTopics = learningMaterial.topics.filter((t) => !isNonAcademicItem(t.title));
       const createdTopics: Array<{ id: string }> = [];
-      for (let i = 0; i < learningMaterial.topics.length; i++) {
-        const t = learningMaterial.topics[i];
+      for (let i = 0; i < validTopics.length; i++) {
+        const t = validTopics[i];
         const topic = await tx.topic.create({
           data: {
             documentId: document.id,

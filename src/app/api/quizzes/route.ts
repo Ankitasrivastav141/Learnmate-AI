@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { generateLearningMaterialFromDocument } from '@/lib/ai-service';
 
 export const dynamic = 'force-dynamic';
 
@@ -76,10 +77,57 @@ export async function POST(req: Request) {
     }
 
     if (allQuestions.length === 0) {
-      return NextResponse.json(
-        { error: 'No questions available for this selection. Upload a document or study resource first!' },
-        { status: 400 }
-      );
+      // Auto-generate questions on the fly if document or subject exists
+      let targetDoc = null;
+      if (documentId) {
+        targetDoc = await prisma.document.findUnique({ where: { id: documentId } });
+      } else if (subjectId) {
+        targetDoc = await prisma.document.findFirst({
+          where: { subjectId, rawText: { not: '' } },
+        });
+      } else {
+        targetDoc = await prisma.document.findFirst({
+          where: { rawText: { not: '' } },
+        });
+      }
+
+      if (targetDoc && targetDoc.rawText) {
+        try {
+          const mat = await generateLearningMaterialFromDocument(targetDoc.title, targetDoc.rawText);
+          if (mat.questions && mat.questions.length > 0) {
+            for (const q of mat.questions) {
+              await prisma.question.create({
+                data: {
+                  documentId: targetDoc.id,
+                  type: q.type || 'mcq',
+                  questionText: q.questionText,
+                  options: JSON.stringify(q.options),
+                  correctAnswer: q.correctAnswer,
+                  explanation: q.explanation,
+                  difficulty: q.difficulty || 'Medium',
+                },
+              });
+            }
+
+            allQuestions = await prisma.question.findMany({
+              where: { documentId: targetDoc.id },
+              include: {
+                document: { select: { id: true, title: true, subjectId: true } },
+                topic: { select: { id: true, title: true } },
+              },
+            });
+          }
+        } catch (genErr) {
+          console.warn('Failed to dynamically generate questions for quiz:', genErr);
+        }
+      }
+
+      if (allQuestions.length === 0) {
+        return NextResponse.json(
+          { error: 'No study materials with questions found. Please upload a lecture presentation (PPTX/PDF) first!' },
+          { status: 400 }
+        );
+      }
     }
 
     // Shuffle and pick up to questionCount
