@@ -131,8 +131,9 @@ async function generateTopicWithGemini(
   apiKey: string
 ): Promise<ComprehensiveTopicContent> {
   const genAI = new GoogleGenerativeAI(apiKey);
+  const modelName = process.env.GEMINI_MODEL || 'gemini-1.5-flash';
   const model = genAI.getGenerativeModel({
-    model: 'gemini-3.5-flash-lite',
+    model: modelName,
     generationConfig: {
       responseMimeType: 'application/json',
       temperature: 0.25,

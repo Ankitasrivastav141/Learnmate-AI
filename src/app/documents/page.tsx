@@ -259,37 +259,22 @@ export default function DocumentsDirectoryPage() {
                   {getStatusBadge(doc.status)}
                 </div>
 
-                <div className="flex items-center gap-3 text-xs text-slate-500 flex-wrap">
-                  <span>{doc.fileName}</span>
+                <div className="flex items-center gap-3 text-xs text-[#64748B] flex-wrap">
+                  <span className="font-medium text-[#111827]">{doc.fileName}</span>
                   <span>•</span>
                   <span>{formatBytes(doc.fileSize)}</span>
-                  <span>•</span>
-                  <span>{doc.pageCount} pages / slides</span>
                   <span>•</span>
                   <span>Uploaded {formatDate(doc.createdAt)}</span>
                 </div>
               </div>
 
-              {/* Study Stats & Actions */}
-              <div className="flex items-center gap-3 shrink-0 self-start md:self-auto">
-                <div className="hidden sm:flex items-center gap-2 text-xs text-slate-500 font-medium mr-2">
-                  <span className="bg-slate-100 px-2 py-1 rounded-md text-slate-700">
-                    {doc._count.notes} Notes
-                  </span>
-                  <span className="bg-slate-100 px-2 py-1 rounded-md text-slate-700">
-                    {doc._count.flashcards} Cards
-                  </span>
-                  <span className="bg-slate-100 px-2 py-1 rounded-md text-slate-700">
-                    {doc._count.questions} MCQs
-                  </span>
-                </div>
-
+              {/* 3 Clear Student Actions */}
+              <div className="flex items-center gap-2 shrink-0 self-start md:self-auto">
                 <Link
-                  href={`/quizzes?documentId=${doc.id}`}
-                  className="p-2 bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-700 rounded-xl transition-colors"
-                  title="Practice Quiz on this document"
+                  href={`/documents/${doc.id}`}
+                  className="px-3.5 py-1.5 rounded-xl bg-[#1E3A8A] hover:bg-[#1e40af] text-white font-semibold text-xs flex items-center gap-1 shadow-sm transition-colors cursor-pointer"
                 >
-                  <GraduationCap className="w-4 h-4" />
+                  Open Study Materials <ChevronRight className="w-3.5 h-3.5" />
                 </Link>
 
                 <button
@@ -297,26 +282,19 @@ export default function DocumentsDirectoryPage() {
                     setRenameTarget({ id: doc.id, title: doc.title });
                     setNewTitle(doc.title);
                   }}
-                  className="p-2 text-slate-400 hover:text-slate-700 rounded-xl hover:bg-slate-100 transition-colors"
+                  className="px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 rounded-xl hover:bg-slate-100 border border-slate-200 transition-colors flex items-center gap-1 cursor-pointer"
                   title="Rename document"
                 >
-                  <Edit2 className="w-4 h-4" />
+                  <Edit2 className="w-3.5 h-3.5" /> Rename
                 </button>
 
                 <button
                   onClick={(e) => handleDelete(e, doc.id, doc.title)}
-                  className="p-2 text-slate-400 hover:text-red-600 rounded-xl hover:bg-red-50 transition-colors"
+                  className="px-2.5 py-1.5 text-xs font-semibold text-red-600 hover:text-red-700 rounded-xl hover:bg-red-50 border border-red-200 transition-colors flex items-center gap-1 cursor-pointer"
                   title="Delete document"
                 >
-                  <Trash2 className="w-4 h-4" />
+                  <Trash2 className="w-3.5 h-3.5" /> Delete
                 </button>
-
-                <Link
-                  href={`/documents/${doc.id}`}
-                  className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs flex items-center gap-1 shadow-sm transition-colors"
-                >
-                  Study Pack <ChevronRight className="w-3.5 h-3.5" />
-                </Link>
               </div>
             </div>
           ))}

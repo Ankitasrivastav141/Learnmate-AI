@@ -194,11 +194,22 @@ export default function SubjectDetailPage({ params }: { params: { id: string } }
 
   if (!subject) {
     return (
-      <div className="py-16 text-center space-y-3">
-        <h2 className="text-lg font-bold text-slate-900">Subject Not Found</h2>
-        <Link href="/subjects" className="text-xs text-blue-600 hover:underline">
-          Return to subjects directory
-        </Link>
+      <div className="py-20 text-center space-y-4 max-w-md mx-auto animate-in fade-in duration-200">
+        <div className="w-12 h-12 rounded-2xl bg-blue-50 flex items-center justify-center text-[#1E3A8A] mx-auto">
+          <BookOpen className="w-6 h-6" />
+        </div>
+        <h2 className="text-lg font-bold text-[#111827]">Subject Not Found</h2>
+        <p className="text-xs text-[#64748B] leading-relaxed">
+          This subject may have been removed or renamed. Browse your subjects directory to access all your active course workspaces.
+        </p>
+        <div>
+          <Link
+            href="/subjects"
+            className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#1E3A8A] hover:bg-[#1e40af] text-white rounded-xl text-xs font-semibold shadow-sm transition-colors"
+          >
+            Go to My Subjects
+          </Link>
+        </div>
       </div>
     );
   }

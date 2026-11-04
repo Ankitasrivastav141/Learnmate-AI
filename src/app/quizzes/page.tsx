@@ -249,23 +249,23 @@ function QuizzesContent() {
   return (
     <div className="space-y-8 animate-in fade-in duration-200">
       {/* 1. Page Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-200">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-[#E2E8F0]">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-            <GraduationCap className="w-6 h-6 text-blue-600" />
-            Practice & Quiz Center
+          <h1 className="text-2xl font-bold text-[#111827] flex items-center gap-2">
+            <GraduationCap className="w-6 h-6 text-[#1E3A8A]" />
+            Quiz History & Practice
           </h1>
-          <p className="text-sm text-slate-500 mt-1">
-            Grounded assessment system with question navigation, slide citations, and persistent mistake review.
+          <p className="text-sm text-[#64748B] mt-1">
+            Practise quizzes grounded in your lectures, review mistakes, and access permanent attempt history.
           </p>
         </div>
 
         <div className="flex items-center gap-3">
           <Link
             href="/analytics"
-            className="px-4 py-2 bg-white border border-slate-300 hover:border-slate-400 text-slate-700 text-xs font-semibold rounded-xl transition-colors shadow-sm flex items-center gap-1.5"
+            className="px-4 py-2 bg-white border border-[#E2E8F0] hover:border-slate-300 text-slate-700 text-xs font-semibold rounded-xl transition-colors shadow-sm flex items-center gap-1.5"
           >
-            <Award className="w-4 h-4 text-amber-500" /> View Quiz Analytics
+            <Award className="w-4 h-4 text-amber-500" /> View Progress
           </Link>
         </div>
       </div>

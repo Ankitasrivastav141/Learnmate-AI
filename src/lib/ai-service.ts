@@ -59,8 +59,10 @@ async function generateWithGemini(
   apiKey: string
 ): Promise<GeneratedStudyMaterial> {
   const genAI = new GoogleGenerativeAI(apiKey);
+  // Use official Gemini model with fallback
+  const modelName = process.env.GEMINI_MODEL || 'gemini-1.5-flash';
   const model = genAI.getGenerativeModel({
-    model: 'gemini-3.5-flash-lite',
+    model: modelName,
     generationConfig: {
       responseMimeType: 'application/json',
       temperature: 0.2,
@@ -71,10 +73,16 @@ async function generateWithGemini(
   const truncatedText = rawText.slice(0, 60000);
 
   const prompt = `
-You are the AI Chief Academic Tutor and Curriculum Specialist for LearnMate AI.
+You are the Master Academic Professor and Curriculum Designer for LearnMate AI.
 Analyze the following academic document titled "${title}".
 The user needs comprehensive, deeply educational study notes—NOT superficial bullet points or brief summaries.
-Every slide or section in a PPT/document contains critical terminology, models, and acronyms that must be clearly explained so that the study notes are genuinely worth reading and sufficient for university/MBA exam mastery.
+Do not simply copy extracted text from the document. Explain concepts in clear, simple, and understandable English.
+For complicated concepts, provide examples that help students understand the subject.
+Preserve important academic terminology.
+For management topics, include relevant business examples.
+For technical topics, explain the concepts step by step.
+For numerical topics, include formulas and worked examples when present in the source material.
+Do not generate generic filler paragraphs. Do not repeat the same explanation under multiple headings.
 
 Document Content:
 """
@@ -83,7 +91,7 @@ ${truncatedText}
 
 You MUST output ONLY a valid JSON object matching this exact structure:
 {
-  "summary": "Comprehensive 3-4 sentence academic overview explaining the document's core principles, scope, and strategic/technical value.",
+  "summary": "Comprehensive 3-4 sentence academic overview explaining the document's core principles, scope, and key takeaways.",
   "topics": [
     {
       "title": "Clear Topic / Unit Name",
@@ -92,16 +100,16 @@ You MUST output ONLY a valid JSON object matching this exact structure:
   ],
   "concepts": [
     {
-      "term": "Term Name (e.g. Preemptive Scheduling, EBITDA, ACID Properties)",
+      "term": "Term Name (e.g. Indifference Curve, EBITDA, Normalization)",
       "definition": "Clear, precise academic definition explaining what it is, how it works in plain English, and why it matters.",
-      "importance": "High", // "High", "Medium", or "Low"
-      "topicIndex": 0 // 0-based index linking to the topics array
+      "importance": "High",
+      "topicIndex": 0
     }
   ],
   "notes": [
     {
-      "title": "Mastery Study Guide: [Topic Name]",
-      "markdownContent": "Extensive, highly readable academic study guide in GitHub-flavored markdown. MUST include:\\n\\n## 1. Deep Conceptual Foundations & Theory\\nExtensive narrative explaining the core concepts thoroughly (avoiding superficial bullet points).\\n\\n## 2. Complete Slide Terminology & Glossary\\nStructured definitions for EVERY term, acronym, and framework mentioned in these slides:\\n| Term / Acronym | Rigorous Definition | In Plain English & Why It Matters |\\n|---|---|---|\\n| ... | ... | ... |\\n\\n## 3. Mechanisms, Architecture & Step-by-Step Logic\\nClear breakdown of processes, mathematical/logical criteria, and operational workflows.\\n\\n## 4. Practical Industry Context & Real-World Application\\nConcrete business or engineering scenario showing how this works in practice.\\n\\n## 5. Comparative Trade-offs & Alternatives\\nTable comparing different approaches, algorithms, or strategies.\\n\\n## 6. High-Yield Examination Prep & Common Pitfalls\\nKey questions and common student mistakes to avoid in exams.",
+      "title": "[Topic Name]: Complete Academic Study Guide",
+      "markdownContent": "# [Topic Name]\\n\\n## 1. Introduction & Overview\\nClear narrative explaining what this topic covers and why it is fundamental.\\n\\n## 2. Detailed Concept Explanation\\nStep-by-step breakdown of principles, theories, and mechanisms in accessible student-friendly English.\\n\\n## 3. Important Definitions\\n> **Key Concept**: Textbook-grade definition with plain-English intuition.\\n\\n## 4. Examples & Practical Applications\\nConcrete real-world or business scenarios demonstrating the concept in action.\\n\\n## 5. Summary Table & Key Comparisons\\n| Approach / Dimension | Description | Key Trade-off |\\n|---|---|---|\\n| ... | ... | ... |\\n\\n## 6. Key Takeaways & Exam Points\\n- High-yield takeaway 1\\n- High-yield takeaway 2\\n\\n## 7. Quick Revision Summary\\nConcise bulleted summary for rapid pre-exam review.",
       "topicIndex": 0
     }
   ],
@@ -109,7 +117,7 @@ You MUST output ONLY a valid JSON object matching this exact structure:
     {
       "front": "Specific term, acronym, or mechanism prompt",
       "back": "Accurate, clear definition and explanation grounded in the text",
-      "difficulty": "Medium", // "Easy", "Medium", or "Hard"
+      "difficulty": "Medium",
       "topicIndex": 0
     }
   ],
@@ -118,19 +126,19 @@ You MUST output ONLY a valid JSON object matching this exact structure:
       "type": "mcq",
       "questionText": "Rigorous academic question testing comprehension of definitions, mechanisms, or trade-offs",
       "options": ["Option A", "Option B", "Option C", "Option D"],
-      "correctAnswer": "Option A", // Must exactly match one of the items in options
-      "explanation": "Detailed explanation citing the underlying academic rationale.",
-      "difficulty": "Medium", // "Easy", "Medium", or "Hard"
+      "correctAnswer": "Option A",
+      "explanation": "Detailed explanation citing why this is correct and why other options are incorrect.",
+      "difficulty": "Medium",
       "topicIndex": 0
     }
   ]
 }
 
 CRITICAL INSTRUCTIONS:
-- Identify and define EVERY significant academic term, acronym, and model found across the slides (generate at least 15 to 25 distinct concepts).
-- For each topic, write substantive, coherent, educational prose—DO NOT simply replicate telegraphic slide bullets.
+- Identify and define all significant academic terms, acronyms, and models found across the material.
+- For each topic, write well-structured, coherent prose formatted with clear headings, callouts, and tables.
 - Generate at least 10 high-quality flashcards.
-- Generate 10 high-yield, 4-option MCQs with thorough explanations.
+- Generate at least 10 high-yield, 4-option MCQs with thorough explanations.
 - Ensure all content is strictly grounded in the uploaded material.
 `;
 

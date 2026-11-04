@@ -146,8 +146,9 @@ export async function GET() {
     for (const ans of answers) {
       const topic = ans.question.topic;
       const doc = ans.question.document;
-      const topicKey = topic?.id || ans.question.documentId || 'general';
-      const topicTitle = topic?.title || doc?.title || 'Core Concepts';
+      // Only include valid academic topic titles, never filenames
+      const topicTitle = topic?.title || 'Core Subject Concepts';
+      const topicKey = topic?.id || `doc-${ans.question.documentId}`;
 
       if (!topicStats[topicKey]) {
         topicStats[topicKey] = {
@@ -155,7 +156,7 @@ export async function GET() {
           topicTitle,
           subjectId: doc?.subjectId || '',
           documentId: doc?.id || '',
-          documentTitle: doc?.title || 'Uploaded Document',
+          documentTitle: doc?.title || 'Study Material',
           totalAnswers: 0,
           correctAnswers: 0,
         };
@@ -167,39 +168,19 @@ export async function GET() {
       }
     }
 
-    let weakTopics = Object.values(topicStats)
+    const weakTopics = Object.values(topicStats)
+      .filter((t) => t.totalAnswers >= 1) // Only assessed topics
       .map((t) => {
         const accuracy = Math.round((t.correctAnswers / t.totalAnswers) * 100);
         return {
           ...t,
           accuracy,
-          reason:
-            accuracy < 60
-              ? `High error rate (${accuracy}% accuracy) in recent quizzes`
-              : `Needs reinforcement (${accuracy}% accuracy)`,
+          reason: `You need more practice in ${t.topicTitle} (${accuracy}% accuracy). Review your notes and attempt another quiz.`,
         };
       })
       .filter((t) => t.accuracy < 75)
       .sort((a, b) => a.accuracy - b.accuracy)
       .slice(0, 4);
-
-    // If no weak topics identified yet from answers, recommend topics from available subjects
-    if (weakTopics.length === 0 && subjects.length > 0) {
-      weakTopics = subjects
-        .filter((s) => s.documents.length > 0)
-        .slice(0, 3)
-        .map((s) => ({
-          topicId: s.documents[0]?.id || '',
-          topicTitle: s.documents[0]?.title || s.name,
-          subjectId: s.id,
-          documentId: s.documents[0]?.id || '',
-          documentTitle: s.documents[0]?.title || s.name,
-          totalAnswers: 0,
-          correctAnswers: 0,
-          accuracy: 0,
-          reason: 'Recommended for initial practice and mastery',
-        }));
-    }
 
     // 6. Weekly Learning Activity (Last 7 days, actual recorded session minutes & quizzes)
     const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];

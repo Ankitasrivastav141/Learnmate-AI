@@ -6,7 +6,7 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const subject = await prisma.subject.findUnique({
+    let subject = await prisma.subject.findUnique({
       where: { id: params.id },
       include: {
         documents: {
@@ -29,6 +29,33 @@ export async function GET(
         },
       },
     });
+
+    if (!subject) {
+      // Fallback: search by name in case route parameter is a slug or name
+      subject = await prisma.subject.findFirst({
+        where: { name: { equals: decodeURIComponent(params.id) } },
+        include: {
+          documents: {
+            orderBy: { createdAt: 'desc' },
+            include: {
+              _count: {
+                select: {
+                  topics: true,
+                  concepts: true,
+                  notes: true,
+                  flashcards: true,
+                  questions: true,
+                },
+              },
+            },
+          },
+          quizSessions: {
+            orderBy: { completedAt: 'desc' },
+            take: 10,
+          },
+        },
+      });
+    }
 
     if (!subject) {
       return NextResponse.json({ error: 'Subject not found' }, { status: 404 });

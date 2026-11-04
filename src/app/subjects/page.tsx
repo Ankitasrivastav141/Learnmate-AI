@@ -93,20 +93,20 @@ export default function SubjectsPage() {
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
       {/* 1. Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[#E2E8F0]">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-            <BookOpen className="w-6 h-6 text-blue-600" />
-            Subject Management
+          <h1 className="text-2xl font-bold text-[#111827] flex items-center gap-2">
+            <BookOpen className="w-6 h-6 text-[#1E3A8A]" />
+            My Subjects
           </h1>
-          <p className="text-sm text-slate-500 mt-1">
+          <p className="text-sm text-[#64748B] mt-1">
             Organize academic courses, maintain independent study materials, and track mastery.
           </p>
         </div>
 
         <button
           onClick={() => setIsCreateOpen(true)}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs shadow-sm hover:shadow transition-all cursor-pointer self-start sm:self-auto"
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#1E3A8A] hover:bg-[#1e40af] text-white font-semibold text-xs shadow-sm transition-all cursor-pointer self-start sm:self-auto"
         >
           <Plus className="w-4 h-4" />
           Create New Subject
@@ -244,7 +244,7 @@ export default function SubjectsPage() {
               <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
                 <Link
                   href={`/subjects/${sub.id}`}
-                  className="flex-1 py-2 text-center bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs rounded-xl shadow-sm transition-colors flex items-center justify-center gap-1.5"
+                  className="flex-1 py-2 text-center bg-[#1E3A8A] hover:bg-[#1e40af] text-white font-semibold text-xs rounded-xl shadow-sm transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
                 >
                   Open Workspace <ArrowRight className="w-3.5 h-3.5" />
                 </Link>

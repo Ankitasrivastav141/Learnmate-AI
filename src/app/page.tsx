@@ -138,47 +138,44 @@ export default function DashboardPage() {
   return (
     <div className="space-y-8 animate-in fade-in duration-200">
       {/* 1. Header & Welcome Section */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-blue-900 via-navy to-slate-900 p-6 md:p-8 text-white shadow-md">
-        <div className="relative z-10 max-w-2xl">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/20 border border-blue-400/30 text-blue-200 text-xs font-semibold mb-3">
-            <Sparkles className="w-3.5 h-3.5 text-blue-400" />
-            AI-Powered Academic Intelligence
+      <div className="bg-white border border-[#E2E8F0] rounded-2xl p-6 md:p-8 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div className="max-w-2xl">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 border border-blue-200 text-[#1E3A8A] text-xs font-semibold mb-3">
+            <Sparkles className="w-3.5 h-3.5 text-[#2563EB]" />
+            Personal Learning Management System
           </div>
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
+          <h1 className="text-2xl md:text-3xl font-bold text-[#111827] tracking-tight">
             Welcome to LearnMate AI
           </h1>
-          <p className="text-sm text-slate-300 mt-2 leading-relaxed">
-            Your personal learning workspace. Organize subjects, convert lecture presentations into comprehensive study packs, master key concepts, and practise grounded quizzes with mistake analysis.
+          <p className="text-sm text-[#64748B] mt-2 leading-relaxed">
+            Your personal learning workspace. Organize subjects, convert lecture presentations into clean digital textbook notes, master key concepts with flashcards, and practise grounded quizzes with mistake analysis.
           </p>
 
           {/* Quick Actions Bar */}
-          <div className="flex flex-wrap items-center gap-3 mt-6">
+          <div className="flex flex-wrap items-center gap-3 mt-5">
             <button
               onClick={() => setIsUploadOpen(true)}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs shadow-md shadow-blue-900/30 transition-all cursor-pointer"
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#1E3A8A] hover:bg-[#1e40af] text-white font-semibold text-xs shadow-sm transition-all cursor-pointer"
             >
               <Upload className="w-4 h-4" />
               Upload Study Material
             </button>
             <button
               onClick={() => setIsCreateSubjectOpen(true)}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs border border-slate-700 transition-all cursor-pointer"
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-[#111827] font-semibold text-xs border border-[#E2E8F0] transition-all cursor-pointer"
             >
-              <Plus className="w-4 h-4" />
+              <Plus className="w-4 h-4 text-[#2563EB]" />
               Create Subject
             </button>
             <Link
               href="/quizzes"
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-semibold text-xs transition-all"
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#2563EB] hover:bg-blue-700 text-white font-semibold text-xs shadow-sm transition-all"
             >
               <GraduationCap className="w-4 h-4" />
               Start Practice Quiz
             </Link>
           </div>
         </div>
-
-        {/* Decorative background glow */}
-        <div className="absolute -top-12 -right-12 w-80 h-80 rounded-full bg-blue-500/10 blur-3xl pointer-events-none" />
       </div>
 
       {/* 2. Overview Statistics (6 metrics) */}
