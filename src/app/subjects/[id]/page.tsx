@@ -105,6 +105,25 @@ export default function SubjectDetailPage({ params }: { params: { id: string } }
       .then((res) => res.json())
       .then((subData) => {
         if (!subData.error) {
+          if (typeof window !== 'undefined') {
+            try {
+              const raw = localStorage.getItem('learnmate_user_docs');
+              if (raw) {
+                const cachedList: DocumentItem[] = JSON.parse(raw);
+                const matching = cachedList.filter(
+                  (d: any) =>
+                    d.subject?.id === subData.id ||
+                    d.subject?.name?.toLowerCase() === subData.name?.toLowerCase()
+                );
+                const existingIds = new Set((subData.documents || []).map((d: any) => d.id));
+                for (const m of matching) {
+                  if (!existingIds.has(m.id)) {
+                    subData.documents = [m, ...(subData.documents || [])];
+                  }
+                }
+              }
+            } catch (_) {}
+          }
           setSubject(subData);
           setEditName(subData.name);
           setEditDescription(subData.description || '');

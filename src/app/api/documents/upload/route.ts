@@ -239,11 +239,42 @@ export async function POST(req: Request) {
         }
       });
 
+      // Fetch the complete bundle for instant client-side persistence and zero-delay rendering
+      const completeDocument = await prisma.document.findUnique({
+        where: { id: document.id },
+        include: {
+          subject: {
+            select: { id: true, name: true, color: true },
+          },
+          topics: {
+            select: { id: true, title: true, summary: true },
+          },
+          notes: {
+            select: { id: true, title: true, markdownContent: true, topicId: true },
+          },
+          flashcards: {
+            select: { id: true, front: true, back: true, difficulty: true },
+          },
+          questions: {
+            select: {
+              id: true,
+              type: true,
+              questionText: true,
+              options: true,
+              correctAnswer: true,
+              explanation: true,
+              difficulty: true,
+            },
+          },
+        },
+      });
+
       return NextResponse.json({
         id: document.id,
         title: docTitle,
         status: 'READY',
         message: 'Document successfully processed and learning material generated!',
+        document: completeDocument,
       });
     } catch (processError) {
       console.error('Error during document processing pipeline:', processError);

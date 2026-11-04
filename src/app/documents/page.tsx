@@ -60,20 +60,40 @@ export default function DocumentsDirectoryPage() {
 
   const loadDocuments = () => {
     setIsLoading(true);
+    let cachedList: DocumentItem[] = [];
+    if (typeof window !== 'undefined') {
+      try {
+        const raw = localStorage.getItem('learnmate_user_docs');
+        if (raw) cachedList = JSON.parse(raw);
+      } catch (_) {}
+    }
+
     fetch('/api/documents', { cache: 'no-store' })
       .then((res) => res.json())
       .then((data) => {
-        if (Array.isArray(data)) {
-          setDocuments(data);
-          const subs = Array.from(
-            new Map(
-              data.map((d) => [d.subject.id, { id: d.subject.id, name: d.subject.name }])
-            ).values()
-          );
-          setSubjectsList(subs);
+        let merged = Array.isArray(data) ? [...data] : [];
+        if (cachedList.length > 0) {
+          const existingIds = new Set(merged.map((d) => d.id));
+          for (const item of cachedList) {
+            if (!existingIds.has(item.id)) {
+              merged.unshift(item);
+            }
+          }
+        }
+        setDocuments(merged);
+        const subs = Array.from(
+          new Map(
+            merged.filter(d => d.subject).map((d) => [d.subject.id, { id: d.subject.id, name: d.subject.name }])
+          ).values()
+        );
+        setSubjectsList(subs);
+      })
+      .catch((err) => {
+        console.error('Failed to load documents:', err);
+        if (cachedList.length > 0) {
+          setDocuments(cachedList);
         }
       })
-      .catch((err) => console.error('Failed to load documents:', err))
       .finally(() => setIsLoading(false));
   };
 
@@ -95,8 +115,16 @@ export default function DocumentsDirectoryPage() {
 
     try {
       const res = await fetch(`/api/documents/${id}`, { method: 'DELETE' });
-      if (res.ok) {
-        setDocuments((prev) => prev.filter((d) => d.id !== id));
+      setDocuments((prev) => prev.filter((d) => d.id !== id));
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.removeItem(`learnmate_doc_${id}`);
+          const raw = localStorage.getItem('learnmate_user_docs');
+          if (raw) {
+            const list = JSON.parse(raw).filter((d: any) => d.id !== id);
+            localStorage.setItem('learnmate_user_docs', JSON.stringify(list));
+          }
+        } catch (_) {}
       }
     } catch (err) {
       console.error('Failed to delete document:', err);

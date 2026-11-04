@@ -156,6 +156,41 @@ export function DocumentUploadModal({
         throw new Error(data.error || 'Failed to process document');
       }
 
+      // Save document to browser persistence layer so it is available across serverless Lambda instances
+      if (data.document && typeof window !== 'undefined') {
+        try {
+          localStorage.setItem(`learnmate_doc_${data.id}`, JSON.stringify(data.document));
+          
+          // Also register in user's documents list
+          const summaryItem = {
+            id: data.document.id,
+            title: data.document.title,
+            fileName: data.document.fileName || data.title,
+            fileType: data.document.fileType || 'pdf',
+            fileSize: data.document.fileSize || 0,
+            status: 'READY',
+            summary: data.document.summary || null,
+            pageCount: data.document.pageCount || 1,
+            wordCount: data.document.wordCount || 0,
+            createdAt: data.document.createdAt || new Date().toISOString(),
+            subject: data.document.subject,
+            _count: {
+              topics: data.document.topics?.length || 0,
+              concepts: 0,
+              notes: data.document.notes?.length || 1,
+              flashcards: data.document.flashcards?.length || 0,
+              questions: data.document.questions?.length || 0,
+            },
+          };
+
+          const existingCached = JSON.parse(localStorage.getItem('learnmate_user_docs') || '[]');
+          const updatedCached = [summaryItem, ...existingCached.filter((d: any) => d.id !== data.id)];
+          localStorage.setItem('learnmate_user_docs', JSON.stringify(updatedCached.slice(0, 50)));
+        } catch (storageErr) {
+          console.warn('LocalStorage save warning:', storageErr);
+        }
+      }
+
       setUploadStep('completed');
       setTimeout(() => {
         setIsUploading(false);

@@ -112,26 +112,61 @@ export default function DocumentStudyHubPage({ params }: { params: { id: string 
   const [quizQuestions, setQuizQuestions] = useState<any[]>([]);
 
   const loadDocument = () => {
-    setIsLoading(true);
+    // 1. Immediately check localStorage fallback to prevent 404 on Vercel multi-instance Lambdas
+    let cachedDoc: DocumentDetail | null = null;
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = localStorage.getItem(`learnmate_doc_${params.id}`);
+        if (stored) {
+          cachedDoc = JSON.parse(stored);
+          setDoc(cachedDoc);
+          setIsLoading(false);
+        }
+      } catch (e) {
+        console.warn('LocalStorage document read warning:', e);
+      }
+    }
+
+    if (!cachedDoc) {
+      setIsLoading(true);
+    }
+
     fetch(`/api/documents/${params.id}`, { cache: 'no-store' })
-      .then((res) => res.json())
+      .then(async (res) => {
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}`);
+        }
+        return res.json();
+      })
       .then((data) => {
-        if (!data.error) {
+        if (!data.error && data.id) {
           setDoc(data);
+          if (typeof window !== 'undefined') {
+            try {
+              localStorage.setItem(`learnmate_doc_${params.id}`, JSON.stringify(data));
+            } catch (_) {}
+          }
           // Load existing personal notes if present
           if (data.personalNotes && data.personalNotes.length > 0) {
             setPersonalNotesContent(data.personalNotes[0].content || '');
             setLastSavedTime(new Date(data.personalNotes[0].updatedAt));
           } else {
-            // Check localStorage fallback
             const localCached = localStorage.getItem(`learnmate_pnotes_${params.id}`);
             if (localCached) {
               setPersonalNotesContent(localCached);
             }
           }
+        } else if (!cachedDoc) {
+          setDoc(null);
         }
       })
-      .catch((err) => console.error('Failed to load document study pack:', err))
+      .catch((err) => {
+        console.warn('API fetch warning, relying on local persistence:', err);
+        // If we already loaded cachedDoc from localStorage, keep it!
+        if (!cachedDoc) {
+          setDoc(null);
+        }
+      })
       .finally(() => setIsLoading(false));
   };
 
