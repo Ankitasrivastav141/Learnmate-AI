@@ -3,7 +3,7 @@ const nextConfig = {
   experimental: {
     serverComponentsExternalPackages: ['officeparser', 'pdf-parse', 'mammoth', 'yauzl'],
     outputFileTracingIncludes: {
-      '/api/**/*': ['./prisma/dev.db'],
+      '/**': ['./prisma/dev.db'],
     },
   },
   webpack: (config) => {

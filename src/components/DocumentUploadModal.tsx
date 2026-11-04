@@ -158,6 +158,10 @@ export function DocumentUploadModal({
 
       setUploadStep('completed');
       setTimeout(() => {
+        setIsUploading(false);
+        setFile(null);
+        setTitle('');
+        setUploadStep('idle');
         onSuccess(data.id);
       }, 1000);
     } catch (err) {

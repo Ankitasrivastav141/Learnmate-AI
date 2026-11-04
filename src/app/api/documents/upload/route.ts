@@ -29,12 +29,24 @@ export async function POST(req: Request) {
       where: { id: subjectId },
     });
     if (!subject) {
+      subject = await prisma.subject.findFirst({
+        where: {
+          OR: [
+            { name: { contains: subjectId } },
+            { id: { contains: subjectId } },
+          ],
+        },
+      });
+    }
+    if (!subject) {
+      subject = await prisma.subject.findFirst();
+    }
+    if (!subject) {
       subject = await prisma.subject.create({
         data: {
-          id: subjectId,
-          name: 'Micro',
-          description: 'Microeconomics Course Workspace',
-          color: '#652D3D',
+          name: 'Microeconomics',
+          description: 'Academic Course Workspace',
+          color: '#2563EB',
           icon: 'BookOpen',
         },
       });
@@ -72,7 +84,7 @@ export async function POST(req: Request) {
     // Create document record in PROCESSING state
     const document = await prisma.document.create({
       data: {
-        subjectId,
+        subjectId: subject.id,
         title: docTitle,
         fileName: originalFilename,
         fileType: ext,

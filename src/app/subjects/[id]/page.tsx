@@ -856,7 +856,14 @@ export default function SubjectDetailPage({ params }: { params: { id: string } }
           onClose={() => setIsUploadOpen(false)}
           preselectedSubjectId={subject.id}
           preselectedSubjectName={subject.name}
-          onSuccess={() => loadData()}
+          onSuccess={(newDocId) => {
+            setIsUploadOpen(false);
+            if (newDocId) {
+              router.push(`/documents/${newDocId}`);
+            } else {
+              loadData();
+            }
+          }}
         />
       )}
     </div>

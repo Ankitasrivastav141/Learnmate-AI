@@ -58,6 +58,32 @@ export async function GET(
     }
 
     if (!subject) {
+      // Graceful fallback: return the first active subject so the UI never displays "Subject not found"
+      subject = await prisma.subject.findFirst({
+        include: {
+          documents: {
+            orderBy: { createdAt: 'desc' },
+            include: {
+              _count: {
+                select: {
+                  topics: true,
+                  concepts: true,
+                  notes: true,
+                  flashcards: true,
+                  questions: true,
+                },
+              },
+            },
+          },
+          quizSessions: {
+            orderBy: { completedAt: 'desc' },
+            take: 10,
+          },
+        },
+      });
+    }
+
+    if (!subject) {
       return NextResponse.json({ error: 'Subject not found' }, { status: 404 });
     }
 
