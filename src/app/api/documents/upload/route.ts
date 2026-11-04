@@ -32,6 +32,7 @@ export async function POST(req: Request) {
       subject = await prisma.subject.findFirst({
         where: {
           OR: [
+            { name: { equals: subjectId } },
             { name: { contains: subjectId } },
             { id: { contains: subjectId } },
           ],
@@ -39,13 +40,13 @@ export async function POST(req: Request) {
       });
     }
     if (!subject) {
-      subject = await prisma.subject.findFirst();
-    }
-    if (!subject) {
+      const isCuid = subjectId.startsWith('cm');
+      const fallbackName = !isCuid && subjectId.length > 2 ? subjectId : 'Market Research';
       subject = await prisma.subject.create({
         data: {
-          name: 'Microeconomics',
-          description: 'Academic Course Workspace',
+          id: isCuid ? subjectId : undefined,
+          name: fallbackName,
+          description: `${fallbackName} Workspace`,
           color: '#2563EB',
           icon: 'BookOpen',
         },
@@ -224,14 +225,18 @@ export async function POST(req: Request) {
           });
         }
 
-        // Log Activity
-        await tx.activityLog.create({
-          data: {
-            subjectId,
-            type: 'UPLOAD',
-            description: `Processed "${docTitle}": generated ${learningMaterial.notes.length} notes, ${learningMaterial.flashcards.length} flashcards, and ${learningMaterial.questions.length} quiz questions.`,
-          },
-        });
+        // Log Activity safely (non-blocking, never fails the upload)
+        try {
+          await tx.activityLog.create({
+            data: {
+              subjectId: subject.id,
+              type: 'UPLOAD',
+              description: `Processed "${docTitle}": generated ${learningMaterial.notes.length} notes, ${learningMaterial.flashcards.length} flashcards, and ${learningMaterial.questions.length} quiz questions.`,
+            },
+          });
+        } catch (logErr) {
+          console.warn('Non-fatal activityLog warning:', logErr);
+        }
       });
 
       return NextResponse.json({
