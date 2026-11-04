@@ -342,8 +342,28 @@ export default function DocumentStudyHubPage({ params }: { params: { id: string 
   }
 
   const filteredNotes = doc.notes.filter(
-    (n) => selectedTopicId === 'ALL' || n.topicId === selectedTopicId
+    (n) => selectedTopicId === 'ALL' || n.topicId === selectedTopicId || doc.notes.length === 1
   );
+
+  const handleTopicJump = (topicId: string, topicTitle?: string) => {
+    setSelectedTopicId(topicId);
+    if (topicId === 'ALL' || !topicTitle) {
+      window.scrollTo({ top: 300, behavior: 'smooth' });
+      return;
+    }
+    setTimeout(() => {
+      const headings = Array.from(document.querySelectorAll('h2, h3'));
+      const cleanTitle = topicTitle.toLowerCase().replace(/[^a-z0-9]/g, ' ').trim();
+      const titleWords = cleanTitle.split(/\s+/).filter((w) => w.length > 3);
+      const target = headings.find((h) => {
+        const text = h.textContent?.toLowerCase() || '';
+        return titleWords.some((w) => text.includes(w));
+      });
+      if (target) {
+        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 50);
+  };
 
   return (
     <div className="space-y-6 animate-in fade-in duration-200 max-w-6xl mx-auto">
@@ -516,7 +536,7 @@ export default function DocumentStudyHubPage({ params }: { params: { id: string 
                 <Bookmark className="w-3.5 h-3.5 text-[#2563EB]" /> Jump to Topic:
               </span>
               <button
-                onClick={() => setSelectedTopicId('ALL')}
+                onClick={() => handleTopicJump('ALL')}
                 className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors shrink-0 cursor-pointer ${
                   selectedTopicId === 'ALL'
                     ? 'bg-[#1E3A8A] text-white shadow-sm'
@@ -528,7 +548,7 @@ export default function DocumentStudyHubPage({ params }: { params: { id: string 
               {doc.topics.map((t) => (
                 <button
                   key={t.id}
-                  onClick={() => setSelectedTopicId(t.id)}
+                  onClick={() => handleTopicJump(t.id, t.title)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors shrink-0 cursor-pointer truncate max-w-[200px] ${
                     selectedTopicId === t.id
                       ? 'bg-[#1E3A8A] text-white shadow-sm'
