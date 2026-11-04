@@ -85,15 +85,13 @@ async function generateWithGemini(
   apiKey: string
 ): Promise<GeneratedStudyMaterial> {
   const genAI = new GoogleGenerativeAI(apiKey);
-  const modelName = process.env.GEMINI_MODEL || 'gemini-1.5-flash';
-  const model = genAI.getGenerativeModel({
-    model: modelName,
-    generationConfig: {
-      responseMimeType: 'application/json',
-      temperature: 0.2,
-      maxOutputTokens: 8192,
-    },
-  });
+  const candidateModels = [
+    process.env.GEMINI_MODEL,
+    'gemini-flash-lite-latest',
+    'gemini-3.8-flash',
+    'gemini-2.5-flash',
+    'gemini-1.5-flash',
+  ].filter(Boolean) as string[];
 
   // Keep up to 60,000 characters to ensure full slide coverage
   const truncatedText = rawText.slice(0, 60000);
@@ -192,11 +190,29 @@ OUTPUT SCHEMA (JSON ONLY):
 Generate 8-12 high-quality flashcards and 8-12 rigorous 4-option MCQs with full explanations.
 `;
 
-  const result = await model.generateContent(prompt);
-  const responseText = result.response.text();
-  const parsed = JSON.parse(responseText) as GeneratedStudyMaterial;
+  let lastError: Error | null = null;
+  for (const modelName of candidateModels) {
+    try {
+      const model = genAI.getGenerativeModel({
+        model: modelName,
+        generationConfig: {
+          responseMimeType: 'application/json',
+          temperature: 0.2,
+          maxOutputTokens: 8192,
+        },
+      });
 
-  return sanitizeMaterial(parsed, title, rawText);
+      const result = await model.generateContent(prompt);
+      const responseText = result.response.text();
+      const parsed = JSON.parse(responseText) as GeneratedStudyMaterial;
+      return sanitizeMaterial(parsed, title, rawText);
+    } catch (err: any) {
+      console.warn(`[ai-service] Candidate model ${modelName} failed:`, err.message);
+      lastError = err;
+    }
+  }
+
+  throw lastError || new Error('All Gemini candidate models failed');
 }
 
 /**
